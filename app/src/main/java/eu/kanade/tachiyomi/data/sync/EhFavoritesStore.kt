@@ -83,6 +83,12 @@ class EhFavoritesStore(
         }
     }
 
+    /**
+     * Forgets the downloaded favorites after signing out or switching the OneDrive account, so no favorites of the
+     * previous account stay marked.
+     */
+    suspend fun clear() = withContext(Dispatchers.IO) { mutex.withLock { clearLocked() } }
+
     private fun clearLocked() {
         file.delete()
         preferences.ehViewerFavoritesETag.delete()

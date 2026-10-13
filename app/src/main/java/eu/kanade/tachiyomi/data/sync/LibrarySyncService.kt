@@ -67,7 +67,7 @@ class LibrarySyncService(
     }
 
     suspend fun signIn(activity: Activity): OneDriveAccount {
-        return oneDriveSyncClient.signIn(activity).also(::updateAccount)
+        return oneDriveSyncClient.signIn(activity).also { updateAccount(it) }
     }
 
     suspend fun signOut() {
@@ -217,13 +217,13 @@ class LibrarySyncService(
         return result.copy(total = merged.entries.count(LibrarySyncEntry::favorite))
     }
 
-    private fun updateAccount(account: OneDriveAccount?) {
+    private suspend fun updateAccount(account: OneDriveAccount?) {
         val previousAccountId = preferences.accountId.get()
         val currentAccountId = account?.id.orEmpty()
         if (previousAccountId != currentAccountId) {
             preferences.baseline.delete()
-            // The ETag belongs to the file of the previous account; the next sync downloads the new one
-            preferences.ehViewerFavoritesETag.delete()
+            // The EhViewer favorites belong to the previous account; the next sync downloads those of the new one
+            ehFavoritesStore.clear()
         }
         if (account == null) {
             preferences.accountId.delete()
