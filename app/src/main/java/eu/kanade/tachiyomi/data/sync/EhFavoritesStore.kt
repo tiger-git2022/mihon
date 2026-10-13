@@ -48,7 +48,11 @@ class EhFavoritesStore(
                 if (!file.exists()) return@withLock
                 runCatching { buildIndex(file.readBytes()) }
                     .onSuccess { _index.value = it }
-                    .onFailure { logcat(LogPriority.ERROR, it) { "Could not read the EhViewer favorites" } }
+                    .onFailure {
+                        logcat(LogPriority.ERROR, it) { "Could not read the EhViewer favorites" }
+                        // A damaged copy: the next sync downloads it again instead of trusting its ETag
+                        clearLocked()
+                    }
             }
         }
     }
