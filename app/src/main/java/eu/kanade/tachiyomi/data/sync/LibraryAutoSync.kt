@@ -41,6 +41,7 @@ import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.manga.repository.MangaRepository
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Automatic OneDrive sync (fork-only feature), with the same rules as the EhViewer fork
@@ -80,6 +81,16 @@ class LibraryAutoSync(
     @Volatile
     private var knownFavorites: Set<LibrarySyncKey>? = null
 
+    /** The library changed while a sync ran, by the sync itself or by the user. */
+    @Volatile
+    private var libraryChangedDuringSync = false
+
+    /**
+     * A catch-up sync was requested. WorkManager drops a request while the catch-up work runs (policy KEEP), so the
+     * running worker checks this flag and syncs again.
+     */
+    private val catchUpRequested = AtomicBoolean(false)
+
     // SharedPreferences keeps listeners weakly, so this one is held here
     private val settingsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key != null && inForeground && isSyncedSetting(key)) notifyChanged()
@@ -87,6 +98,12 @@ class LibraryAutoSync(
 
     val isAllowed: Boolean
         get() = preferences.accountId.get().isNotBlank() && preferences.autoSync.get()
+
+    private val isChangeSyncAllowed: Boolean
+        get() = isAllowed && preferences.syncOnChange.get()
+
+    /** Called by [LibrarySyncWorker]; true when a catch-up sync was requested since the last call. */
+    fun takeCatchUpRequest(): Boolean = catchUpRequested.getAndSet(false)
 
     /** Called once from the Application. */
     fun init() {
@@ -127,12 +144,12 @@ class LibraryAutoSync(
             pendingAfterSync = false
             pending
         }
-        if (pending && isAllowed) enqueueCatchUpWork()
+        if (pending && isChangeSyncAllowed) enqueueCatchUpWork()
     }
 
     /** Called by the screens where the user changes synced data. */
     fun notifyChanged() {
-        if (!isAllowed || !preferences.syncOnChange.get()) return
+        if (!isChangeSyncAllowed) return
         synchronized(lock) {
             if (service.isSyncing) {
                 pendingAfterSync = true
@@ -152,6 +169,8 @@ class LibraryAutoSync(
                     debounceJob = null
                     batchStartedAt = 0L
                 }
+                // The options may have been turned off during the countdown
+                if (!isChangeSyncAllowed) return@launch
                 // Not a child of the countdown, so a later change cannot cancel the running sync
                 scope.launch { syncNowOrLater() }
             }
@@ -180,8 +199,11 @@ class LibraryAutoSync(
         val rerun = synchronized(lock) {
             pendingAfterSync.also { pendingAfterSync = false }
         }
-        // Library changes made while the sync ran were not counted, see observeLibrary
-        if (rerun || (knownFavorites != null && libraryChangedSinceSync())) notifyChanged()
+        // Library changes made while the sync ran were not counted, see observeLibrary. Only checked when the
+        // library was written meanwhile: a library that differs from the synced state without any write (if the
+        // sync could not apply an entry) must not start a sync after every sync.
+        val libraryWritten = libraryChangedDuringSync.also { libraryChangedDuringSync = false }
+        if (rerun || (libraryWritten && libraryChangedSinceSync())) notifyChanged()
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -196,7 +218,11 @@ class LibraryAutoSync(
             .onEach { keys ->
                 val previous = knownFavorites
                 knownFavorites = keys
-                if (keys == null || previous == null || keys == previous || service.isSyncing) return@onEach
+                if (keys == null || previous == null || keys == previous) return@onEach
+                if (service.isSyncing) {
+                    libraryChangedDuringSync = true
+                    return@onEach
+                }
                 // A late emission of what the sync itself wrote matches the state after the sync
                 if (libraryChangedSinceSync()) notifyChanged()
             }
@@ -257,6 +283,7 @@ class LibraryAutoSync(
 
     /** Syncs once the network allows it, also after the app went to the background. */
     private fun enqueueCatchUpWork() {
+        catchUpRequested.set(true)
         val request = OneTimeWorkRequestBuilder<LibrarySyncWorker>()
             .setConstraints(constraints())
             .addTag(CATCH_UP_WORK_NAME)
@@ -277,8 +304,13 @@ class LibrarySyncWorker(context: Context, workerParams: WorkerParameters) : Coro
         val graph = applicationContext.appGraph
         if (!graph.libraryAutoSync.isAllowed) return Result.success()
         return try {
-            // Background syncs show nothing; a failed secondary step is in the result's warning only
-            graph.librarySyncService.sync()
+            graph.libraryAutoSync.takeCatchUpRequest()
+            var syncs = 0
+            do {
+                // Background syncs show nothing; a failed secondary step is in the result's warning only
+                graph.librarySyncService.sync()
+                // Changes requested a catch-up sync while this one ran
+            } while (++syncs < MAX_SYNCS_PER_RUN && graph.libraryAutoSync.takeCatchUpRequest())
             Result.success()
         } catch (e: CancellationException) {
             throw e
@@ -290,6 +322,10 @@ class LibrarySyncWorker(context: Context, workerParams: WorkerParameters) : Coro
             logcat(LogPriority.ERROR, e)
             Result.retry()
         }
+    }
+
+    private companion object {
+        const val MAX_SYNCS_PER_RUN = 3
     }
 }
 

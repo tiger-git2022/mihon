@@ -53,7 +53,7 @@ class LibrarySyncService(
     val isSyncing: Boolean
         get() = syncMutex.isLocked
 
-    /** Library entries right after the last library sync step in this process, null before it. */
+    /** Library entries written to OneDrive by the last library sync step in this process, null before it. */
     @Volatile
     var lastSyncedFavorites: Set<LibrarySyncKey>? = null
         private set
@@ -204,7 +204,8 @@ class LibrarySyncService(
         )
         val result = applyMergedState(merged, localState.mangaByKey, now)
         preferences.baseline.set(json.encodeToString(merged))
-        lastSyncedFavorites = mangaRepository.getFavorites().mapTo(HashSet()) { LibrarySyncKey(it.source, it.url) }
+        // The state written to OneDrive, not read back: a change made meanwhile must still count as a change
+        lastSyncedFavorites = merged.entries.filter(LibrarySyncEntry::favorite).mapTo(HashSet(), LibrarySyncEntry::key)
         return result.copy(total = merged.entries.count(LibrarySyncEntry::favorite))
     }
 
