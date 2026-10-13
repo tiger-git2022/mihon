@@ -1,9 +1,12 @@
 package eu.kanade.presentation.more.settings.screen
 
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -58,6 +61,7 @@ import eu.kanade.tachiyomi.util.system.toast
 import eu.kanade.tachiyomi.util.system.workManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import mihon.app.di.appGraph
 import tachiyomi.core.common.i18n.stringResource
@@ -104,9 +108,148 @@ object SettingsDataScreen : SearchableSettings {
             Preference.PreferenceItem.InfoPreference(stringResource(MR.strings.pref_storage_location_info)),
 
             getBackupAndRestoreGroup(backupPreferences = backupPreferences),
+            getLibrarySyncGroup(),
             getDataGroup(),
             getExportGroup(),
         )
+    }
+
+    @Composable
+    private fun getLibrarySyncGroup(): Preference.PreferenceGroup {
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        val preferences = remember { context.appGraph.librarySyncPreferences }
+        val service = remember { context.appGraph.librarySyncService }
+        val accountName by preferences.accountName.collectAsState()
+        val activity = remember(context) { context.findActivity() }
+        var isBusy by remember { mutableStateOf(false) }
+
+        LaunchedEffect(service) {
+            runCatching { service.refreshAccount() }
+                .onFailure { logcat(LogPriority.ERROR, it) }
+        }
+
+        val status = if (accountName.isBlank()) {
+            stringResource(MR.strings.library_sync_not_signed_in)
+        } else {
+            stringResource(MR.strings.library_sync_signed_in_as, accountName)
+        }
+
+        return Preference.PreferenceGroup(
+            title = stringResource(MR.strings.library_sync),
+            preferenceItems = buildList {
+                add(
+                    Preference.PreferenceItem.InfoPreference(status),
+                )
+                if (accountName.isBlank()) {
+                    add(
+                        Preference.PreferenceItem.TextPreference(
+                            title = if (isBusy) {
+                                stringResource(MR.strings.library_sync_signing_in)
+                            } else {
+                                stringResource(MR.strings.library_sync_sign_in)
+                            },
+                            enabled = activity != null && !isBusy,
+                            onClick = {
+                                if (activity != null) {
+                                    isBusy = true
+                                    scope.launch {
+                                        runCatching { service.signIn(activity) }
+                                            .onSuccess {
+                                                context.toast(MR.strings.library_sync_sign_in_success)
+                                            }
+                                            .onFailure { error ->
+                                                logcat(LogPriority.ERROR, error)
+                                                context.toast(
+                                                    context.stringResource(
+                                                        MR.strings.library_sync_sign_in_failed,
+                                                        error.message.orEmpty(),
+                                                    ),
+                                                )
+                                            }
+                                        isBusy = false
+                                    }
+                                }
+                            },
+                        ),
+                    )
+                } else {
+                    add(
+                        Preference.PreferenceItem.TextPreference(
+                            title = if (isBusy) {
+                                stringResource(MR.strings.library_sync_syncing)
+                            } else {
+                                stringResource(MR.strings.library_sync_now)
+                            },
+                            enabled = !isBusy,
+                            onClick = {
+                                isBusy = true
+                                scope.launch {
+                                    runCatching {
+                                        withContext(Dispatchers.IO) { service.sync() }
+                                    }.onSuccess { result ->
+                                        context.toast(
+                                            context.stringResource(
+                                                MR.strings.library_sync_success,
+                                                result.added,
+                                                result.removed,
+                                                result.total,
+                                            ),
+                                        )
+                                    }.onFailure { error ->
+                                        logcat(LogPriority.ERROR, error)
+                                        Log.e("LibrarySync", "Library sync failed", error)
+                                        context.toast(
+                                            context.stringResource(
+                                                MR.strings.library_sync_failed,
+                                                error.message.orEmpty(),
+                                            ),
+                                        )
+                                    }
+                                    isBusy = false
+                                }
+                            },
+                        ),
+                    )
+                    add(
+                        Preference.PreferenceItem.TextPreference(
+                            title = stringResource(MR.strings.library_sync_sign_out),
+                            enabled = !isBusy,
+                            onClick = {
+                                isBusy = true
+                                scope.launch {
+                                    runCatching { service.signOut() }
+                                        .onSuccess {
+                                            context.toast(MR.strings.library_sync_sign_out_success)
+                                        }
+                                        .onFailure { error ->
+                                            logcat(LogPriority.ERROR, error)
+                                            context.toast(
+                                                context.stringResource(
+                                                    MR.strings.library_sync_sign_out_failed,
+                                                    error.message.orEmpty(),
+                                                ),
+                                            )
+                                        }
+                                    isBusy = false
+                                }
+                            },
+                        ),
+                    )
+                }
+                add(
+                    Preference.PreferenceItem.InfoPreference(
+                        stringResource(MR.strings.library_sync_info),
+                    ),
+                )
+            },
+        )
+    }
+
+    private fun Context.findActivity(): Activity? = when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
     }
 
     @Composable

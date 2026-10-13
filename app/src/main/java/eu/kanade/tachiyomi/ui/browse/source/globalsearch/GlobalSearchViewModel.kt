@@ -18,14 +18,22 @@ import tachiyomi.domain.source.service.SourceManager
 class GlobalSearchViewModel(
     @Assisted initialQuery: String,
     @Assisted initialExtensionFilter: String?,
-    sourcePreferences: SourcePreferences,
+    private val sourcePreferences: SourcePreferences,
     sourceManager: SourceManager,
     extensionManager: ExtensionManager,
     networkToLocalManga: NetworkToLocalManga,
     getManga: GetManga,
     preferences: SourcePreferences,
 ) : SearchViewModel(
-    initialState = State(searchQuery = initialQuery),
+    initialState = State(
+        searchQuery = initialQuery,
+        searchHistory = sourcePreferences.globalSearchHistory.get(),
+        sourceFilter = if (sourcePreferences.pinnedSources.get().isEmpty()) {
+            SourceFilter.All
+        } else {
+            SourceFilter.PinnedOnly
+        },
+    ),
     sourcePreferences = sourcePreferences,
     sourceManager = sourceManager,
     extensionManager = extensionManager,
@@ -55,5 +63,27 @@ class GlobalSearchViewModel(
     override fun getEnabledSources(): List<Source> {
         return super.getEnabledSources()
             .filter { state.value.sourceFilter != SourceFilter.PinnedOnly || "${it.id}" in pinnedSources }
+    }
+
+    override fun search() {
+        val query = state.value.searchQuery?.trim().orEmpty()
+        if (query.isEmpty()) return
+
+        updateSearchQuery(query)
+        updateSearchHistory(sourcePreferences.globalSearchHistory.get().withSearchQuery(query))
+        super.search()
+    }
+
+    fun removeSearchHistory(query: String) {
+        updateSearchHistory(state.value.searchHistory - query)
+    }
+
+    fun clearSearchHistory() {
+        updateSearchHistory(emptyList())
+    }
+
+    private fun updateSearchHistory(history: List<String>) {
+        sourcePreferences.globalSearchHistory.set(history)
+        updateState { it.copy(searchHistory = history) }
     }
 }

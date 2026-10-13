@@ -76,6 +76,8 @@
     <string name="action_search_hint">Search…</string>
     <string name="action_search_settings">Search settings</string>
     <string name="action_global_search">Global search</string>
+    <string name="recent_searches">Recent searches</string>
+    <string name="clear_search_history">Clear search history</string>
     <string name="action_select_all">Select all</string>
     <string name="action_select_inverse">Select inverse</string>
     <string name="action_mark_as_read">Mark as read</string>
@@ -613,6 +615,23 @@
     <string name="export">Export</string>
     <string name="library_list">Library List</string>
     <string name="library_exported">Library Exported</string>
+
+    <!-- Library sync -->
+    <string name="library_sync">Library sync</string>
+    <string name="library_sync_not_signed_in">Not signed in to OneDrive</string>
+    <string name="library_sync_signed_in_as">OneDrive: %s</string>
+    <string name="library_sync_sign_in">Sign in to OneDrive</string>
+    <string name="library_sync_signing_in">Signing in…</string>
+    <string name="library_sync_sign_in_success">Signed in to OneDrive</string>
+    <string name="library_sync_sign_in_failed">OneDrive sign-in failed: %s</string>
+    <string name="library_sync_now">Sync now</string>
+    <string name="library_sync_syncing">Syncing…</string>
+    <string name="library_sync_sign_out">Sign out of OneDrive</string>
+    <string name="library_sync_sign_out_success">Signed out of OneDrive</string>
+    <string name="library_sync_sign_out_failed">OneDrive sign-out failed: %s</string>
+    <string name="library_sync_success">Sync complete: %1$d added, %2$d removed, %3$d in library</string>
+    <string name="library_sync_failed">Library sync failed: %s</string>
+    <string name="library_sync_info">Stores library additions and removals in the app's private OneDrive folder. Sign in with the same Microsoft account on each device and sync one device at a time. Categories, reading progress, downloads, and search history are not synchronized.</string>
 
     <!-- Sync section -->
     <string name="syncing_library">Syncing library</string>

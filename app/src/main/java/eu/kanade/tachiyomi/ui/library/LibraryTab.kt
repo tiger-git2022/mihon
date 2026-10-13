@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.ui.library
 
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.graphics.res.animatedVectorResource
 import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
@@ -12,8 +13,10 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -44,11 +47,16 @@ import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
+import eu.kanade.tachiyomi.ui.setting.SettingsScreen
+import eu.kanade.tachiyomi.util.system.toast
 import eu.kanade.tachiyomi.util.system.workManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import mihon.app.di.appGraph
 import mihon.feature.migration.config.MigrationConfigScreen
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.launchIO
@@ -61,6 +69,7 @@ import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.screens.EmptyScreen
 import tachiyomi.presentation.core.screens.EmptyScreenAction
 import tachiyomi.presentation.core.screens.LoadingScreen
+import tachiyomi.presentation.core.util.collectAsState
 import tachiyomi.source.local.isLocal
 
 data object LibraryTab : Tab {
@@ -91,8 +100,17 @@ data object LibraryTab : Tab {
         val viewModel = metroViewModel<LibraryViewModel>()
         val settingsViewModel = metroViewModel<LibrarySettingsViewModel>()
         val state by viewModel.state.collectAsStateWithLifecycle()
+        val librarySyncPreferences = remember { context.appGraph.librarySyncPreferences }
+        val librarySyncService = remember { context.appGraph.librarySyncService }
+        val librarySyncAccountName by librarySyncPreferences.accountName.collectAsState()
+        var isLibrarySyncing by remember { mutableStateOf(false) }
 
         val snackbarHostState = remember { SnackbarHostState() }
+
+        LaunchedEffect(librarySyncService) {
+            runCatching { librarySyncService.refreshAccount() }
+                .onFailure { Log.e("LibrarySync", "Could not refresh the OneDrive account", it) }
+        }
 
         val onClickRefresh: (Category?) -> Boolean = { category ->
             val started = LibraryUpdateJob.startNow(context.workManager, category)
@@ -122,6 +140,37 @@ data object LibraryTab : Tab {
                     onClickSelectAll = viewModel::selectAll,
                     onClickInvertSelection = viewModel::invertSelection,
                     onClickFilter = viewModel::showSettingsDialog,
+                    onClickLibrarySync = {
+                        if (librarySyncAccountName.isBlank()) {
+                            navigator.push(SettingsScreen(SettingsScreen.Destination.DataAndStorage))
+                        } else if (!isLibrarySyncing) {
+                            isLibrarySyncing = true
+                            scope.launch {
+                                runCatching {
+                                    withContext(Dispatchers.IO) { librarySyncService.sync() }
+                                }.onSuccess { result ->
+                                    context.toast(
+                                        context.stringResource(
+                                            MR.strings.library_sync_success,
+                                            result.added,
+                                            result.removed,
+                                            result.total,
+                                        ),
+                                    )
+                                }.onFailure { error ->
+                                    Log.e("LibrarySync", "Library sync failed", error)
+                                    context.toast(
+                                        context.stringResource(
+                                            MR.strings.library_sync_failed,
+                                            error.message.orEmpty(),
+                                        ),
+                                    )
+                                }
+                                isLibrarySyncing = false
+                            }
+                        }
+                    },
+                    isLibrarySyncing = isLibrarySyncing,
                     onClickRefresh = { onClickRefresh(state.activeCategory) },
                     onClickGlobalUpdate = { onClickRefresh(null) },
                     onClickOpenRandomManga = {

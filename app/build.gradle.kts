@@ -269,6 +269,11 @@ dependencies {
     implementation(libs.bundles.okhttp)
     implementation(libs.okio)
     implementation(libs.conscrypt) // TLS 1.3 support for Android < 10
+    implementation(libs.msal) {
+        // Only used for the legacy Surface Duo hinge layout and is no longer
+        // available from the repositories used by this project.
+        exclude(group = "com.microsoft.device.display", module = "display-mask")
+    }
 
     // Data serialization (JSON, protobuf, xml)
     implementation(libs.bundles.serialization)

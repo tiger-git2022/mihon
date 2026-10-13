@@ -5,6 +5,9 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import eu.kanade.domain.source.interactor.SetMigrateSorting
 import eu.kanade.tachiyomi.util.system.LocaleHelper
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import mihon.domain.migration.models.MigrationFlag
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
@@ -68,6 +71,27 @@ class SourcePreferences(
         Preference.appStateKey("has_filters_toggle_state"),
         false,
     )
+
+    val globalSearchHistory: Preference<List<String>> = preferenceStore.getObjectFromString(
+        key = "global_search_history",
+        defaultValue = emptyList(),
+        serializer = { Json.encodeToString(it) },
+        deserializer = { Json.decodeFromString(it) },
+    )
+
+    private val legacyGlobalSearchHistory: Preference<List<String>> = preferenceStore.getObjectFromString(
+        key = Preference.appStateKey("global_search_history"),
+        defaultValue = emptyList(),
+        serializer = { Json.encodeToString(it) },
+        deserializer = { Json.decodeFromString(it) },
+    )
+
+    init {
+        if (!globalSearchHistory.isSet() && legacyGlobalSearchHistory.isSet()) {
+            globalSearchHistory.set(legacyGlobalSearchHistory.get())
+            legacyGlobalSearchHistory.delete()
+        }
+    }
 
     val migrationSources: Preference<List<Long>> = preferenceStore.getLongArray("migration_sources", emptyList())
 

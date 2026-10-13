@@ -125,7 +125,7 @@ abstract class SearchViewModel(
         preferences.globalSearchFilterState.toggle()
     }
 
-    fun search() {
+    open fun search() {
         val query = state.value.searchQuery
         val sourceFilter = state.value.sourceFilter
 
@@ -216,6 +216,7 @@ abstract class SearchViewModel(
         val searchQuery: String? = null,
         val sourceFilter: SourceFilter = SourceFilter.PinnedOnly,
         val onlyShowHasResults: Boolean = false,
+        val searchHistory: List<String> = emptyList(),
         val items: Map<Source, SearchItemResult> = mapOf(),
         val dialog: Dialog? = null,
     ) {

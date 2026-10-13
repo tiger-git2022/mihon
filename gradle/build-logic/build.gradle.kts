@@ -5,6 +5,12 @@ plugins {
     `java-gradle-plugin`
 }
 
+// This is an included build, so it needs its own output redirect.
+layout.buildDirectory.set(
+    file(System.getProperty("user.home"))
+        .resolve(".gradle/project-builds/mihon/build-logic"),
+)
+
 // Configuration should be synced with [/gradle/build-logic/src/main/kotlin/PluginSpotless.kt]
 val ktlintVersion = libs.ktlint.bom.get().version
 val editorConfigFile = rootProject.file("../../.editorconfig")

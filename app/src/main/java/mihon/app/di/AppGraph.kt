@@ -25,6 +25,8 @@ import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.library.LibraryUpdateJob
 import eu.kanade.tachiyomi.data.library.MetadataUpdateJob
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
+import eu.kanade.tachiyomi.data.sync.LibrarySyncPreferences
+import eu.kanade.tachiyomi.data.sync.LibrarySyncService
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.data.updater.AppUpdateChecker
 import eu.kanade.tachiyomi.extension.ExtensionManager
@@ -88,10 +90,12 @@ interface AppGraph : ViewModelGraph {
     val privacyPreferences: PrivacyPreferences
     val securityPreferences: SecurityPreferences
     val downloadPreferences: DownloadPreferences
+    val librarySyncPreferences: LibrarySyncPreferences
 
     val crashLogUtil: CrashLogUtil
 
     val downloadManager: DownloadManager
+    val librarySyncService: LibrarySyncService
 
     val updateChecker: AppUpdateChecker
 

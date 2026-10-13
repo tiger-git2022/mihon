@@ -64,6 +64,12 @@ class GlobalSearchScreen(
                 navigateUp = navigator::pop,
                 onChangeSearchQuery = viewModel::updateSearchQuery,
                 onSearch = { viewModel.search() },
+                onClickSearchHistory = { query ->
+                    viewModel.updateSearchQuery(query)
+                    viewModel.search()
+                },
+                onDeleteSearchHistory = viewModel::removeSearchHistory,
+                onClearSearchHistory = viewModel::clearSearchHistory,
                 getManga = { viewModel.getManga(it) },
                 onChangeSearchFilter = viewModel::setSourceFilter,
                 onToggleResults = viewModel::toggleFilterResults,

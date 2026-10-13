@@ -22,6 +22,17 @@ plugins {
     alias(mihonx.plugins.spotless)
 }
 
+// Keep generated files outside OneDrive so cloud placeholders and sync locks
+// cannot corrupt Gradle's incremental compilation snapshots.
+val localBuildRoot = file(System.getProperty("user.home"))
+    .resolve(".gradle/project-builds/mihon")
+
+layout.buildDirectory.set(localBuildRoot.resolve("root"))
+subprojects {
+    val projectBuildPath = path.removePrefix(":").replace(":", "/")
+    layout.buildDirectory.set(localBuildRoot.resolve(projectBuildPath))
+}
+
 val buildLogic: IncludedBuild = gradle.includedBuild("build-logic")
 tasks {
     listOf("clean", "spotlessApply", "spotlessCheck").forEach { task ->

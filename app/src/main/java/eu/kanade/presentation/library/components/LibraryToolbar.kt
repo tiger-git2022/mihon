@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.FlipToBack
 import androidx.compose.material.icons.outlined.SelectAll
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,6 +34,8 @@ fun LibraryToolbar(
     onClickSelectAll: () -> Unit,
     onClickInvertSelection: () -> Unit,
     onClickFilter: () -> Unit,
+    onClickLibrarySync: () -> Unit,
+    isLibrarySyncing: Boolean,
     onClickRefresh: () -> Unit,
     onClickGlobalUpdate: () -> Unit,
     onClickOpenRandomManga: () -> Unit,
@@ -52,6 +55,8 @@ fun LibraryToolbar(
         searchQuery = searchQuery,
         onSearchQueryChange = onSearchQueryChange,
         onClickFilter = onClickFilter,
+        onClickLibrarySync = onClickLibrarySync,
+        isLibrarySyncing = isLibrarySyncing,
         onClickRefresh = onClickRefresh,
         onClickGlobalUpdate = onClickGlobalUpdate,
         onClickOpenRandomManga = onClickOpenRandomManga,
@@ -66,6 +71,8 @@ private fun LibraryRegularToolbar(
     searchQuery: String?,
     onSearchQueryChange: (String?) -> Unit,
     onClickFilter: () -> Unit,
+    onClickLibrarySync: () -> Unit,
+    isLibrarySyncing: Boolean,
     onClickRefresh: () -> Unit,
     onClickGlobalUpdate: () -> Unit,
     onClickOpenRandomManga: () -> Unit,
@@ -101,6 +108,19 @@ private fun LibraryRegularToolbar(
                         icon = Icons.Outlined.FilterList,
                         iconTint = filterTint,
                         onClick = onClickFilter,
+                    ),
+                    AppBar.Action(
+                        title = stringResource(
+                            if (isLibrarySyncing) {
+                                MR.strings.library_sync_syncing
+                            } else {
+                                MR.strings.library_sync_now
+                            },
+                        ),
+                        icon = Icons.Outlined.Sync,
+                        onClick = onClickLibrarySync,
+                        enabled = !isLibrarySyncing,
+                        isLoading = isLibrarySyncing,
                     ),
                     AppBar.OverflowAction(
                         title = stringResource(MR.strings.action_update_library),
