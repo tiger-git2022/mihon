@@ -78,14 +78,20 @@ class LibrarySyncService(
      * Syncs the library, then the search history, the manga marks and this device's settings
      * backup. A failure after the library step is reported in [LibrarySyncResult.warning].
      */
-    suspend fun sync(): LibrarySyncResult = try {
-        syncLocked()
+    suspend fun sync(): LibrarySyncResult = checkNotNull(syncIf { true })
+
+    /**
+     * [sync], unless [canStart] returns false once the previous sync has finished. Automatic syncs check their
+     * options there, since they may have changed while the sync waited.
+     */
+    suspend fun syncIf(canStart: () -> Boolean): LibrarySyncResult? = try {
+        syncMutex.withLock { if (canStart()) syncLocked() else null }
     } finally {
         // After the lock is released, so a listener can start the next sync right away
         _finished.tryEmit(Unit)
     }
 
-    private suspend fun syncLocked(): LibrarySyncResult = syncMutex.withLock {
+    private suspend fun syncLocked(): LibrarySyncResult {
         try {
             _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.LIBRARY)
             val account = oneDriveSyncClient.currentAccount()
@@ -103,7 +109,7 @@ class LibrarySyncService(
                     }
                 },
             )
-            result.copy(warning = warnings.takeIf { it.isNotEmpty() }?.joinToString("; "))
+            return result.copy(warning = warnings.takeIf { it.isNotEmpty() }?.joinToString("; "))
         } finally {
             _progress.value = null
         }

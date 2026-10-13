@@ -13,7 +13,6 @@ import androidx.preference.PreferenceManager
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
@@ -122,14 +121,18 @@ class LibraryAutoSync(
     private val isChangeSyncAllowed: Boolean
         get() = isAllowed && preferences.syncOnChange.get()
 
+    private fun isCatchUpPending(): Boolean = synchronized(lock) {
+        preferences.catchUpRequested.get() > preferences.catchUpSynced.get()
+    }
+
     /**
-     * Clears the catch-up request [seen] when a sync started, once that sync finished. A newer request came from a
-     * change the sync may have missed, so it stays. A sync stopped by WorkManager or a killed process clears nothing,
-     * so its rerun still syncs.
+     * Marks the catch-up requests up to [request] as synced, once a sync that started after them has finished. Later
+     * requests came from changes that sync may have missed, so they stay. A sync stopped by WorkManager or a killed
+     * process marks nothing, so its rerun still syncs.
      */
-    private fun clearCatchUpRequest(seen: Long) {
+    private fun markCatchUpSynced(request: Long) {
         synchronized(lock) {
-            if (seen != 0L && preferences.catchUpRequest.get() == seen) preferences.catchUpRequest.set(0L)
+            if (request > preferences.catchUpSynced.get()) preferences.catchUpSynced.set(request)
         }
     }
 
@@ -226,8 +229,13 @@ class LibraryAutoSync(
             foregroundSyncs++
         }
         var synced = false
+        var requestAtStart = 0L
         try {
-            val result = service.sync()
+            val result = service.syncIf {
+                requestAtStart = preferences.catchUpRequested.get()
+                // The options may have changed while this sync waited for another one
+                if (fromChange) isChangeSyncAllowed else isAllowed
+            } ?: return
             synced = result.warning == null
             // A failed search history, marks or settings step: WorkManager retries with backoff
             if (!synced) enqueueCatchUpWork(fromChange)
@@ -244,8 +252,10 @@ class LibraryAutoSync(
                 foregroundSyncs--
                 if (foregroundSyncs == 0) handoffRequest.also { handoffRequest = 0L } else 0L
             }
-            // The queued catch-up of changes then finds nothing to sync, unless a later change asked for one
-            if (synced) clearCatchUpRequest(handoff)
+            if (synced) {
+                // The handoff is covered too, unless another request came between the start and the handoff
+                markCatchUpSynced(if (handoff == requestAtStart + 1) handoff else requestAtStart)
+            }
         }
     }
 
@@ -253,16 +263,21 @@ class LibraryAutoSync(
      * The sync of [LibrarySyncWorker]. The options are checked again here, since they may have changed after the
      * work was queued.
      */
-    internal suspend fun runWork(catchUpFromChange: Boolean, runAttemptCount: Int): WorkOutcome {
-        if (!isAllowed || (catchUpFromChange && !preferences.syncOnChange.get())) return WorkOutcome.SUCCESS
+    internal suspend fun runWork(catchUp: Boolean, catchUpFromChange: Boolean, runAttemptCount: Int): WorkOutcome {
+        fun canSync() = isAllowed && (!catchUpFromChange || preferences.syncOnChange.get()) &&
+            // Another sync already covered the requests of this catch-up
+            (!catchUp || isCatchUpPending())
+        if (!canSync()) return WorkOutcome.SUCCESS
         // Queued with a network constraint from before "only on Wi-Fi" was turned on
         if (!isNetworkAllowed()) return WorkOutcome.RETRY
-        val request = preferences.catchUpRequest.get()
-        // Catch-up work is appended behind running work; an earlier one in the chain already synced these changes
-        if (catchUpFromChange && request == 0L) return WorkOutcome.SUCCESS
+        var request = 0L
         val outcome = try {
             // Background syncs show nothing
-            val result = service.sync()
+            val result = service.syncIf {
+                request = preferences.catchUpRequested.get()
+                // Checked again once the previous sync has finished
+                canSync()
+            } ?: return WorkOutcome.SUCCESS
             if (result.warning == null) WorkOutcome.SUCCESS else retryOrFail(runAttemptCount)
         } catch (e: CancellationException) {
             throw e
@@ -275,7 +290,7 @@ class LibraryAutoSync(
             retryOrFail(runAttemptCount)
         }
         // A retry still has these changes to sync
-        if (outcome != WorkOutcome.RETRY) clearCatchUpRequest(request)
+        if (outcome != WorkOutcome.RETRY) markCatchUpSynced(request)
         return outcome
     }
 
@@ -367,7 +382,7 @@ class LibraryAutoSync(
             workManager.enqueueUniquePeriodicWork(PERIODIC_WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
         } else {
             workManager.cancelUniqueWork(PERIODIC_WORK_NAME)
-            workManager.cancelUniqueWork(CATCH_UP_WORK_NAME)
+            workManager.cancelAllWorkByTag(CATCH_UP_WORK_NAME)
         }
     }
 
@@ -377,16 +392,18 @@ class LibraryAutoSync(
      */
     private fun enqueueCatchUpWork(fromChange: Boolean): Long {
         val request = synchronized(lock) {
-            (preferences.catchUpRequest.get() + 1).also(preferences.catchUpRequest::set)
+            (preferences.catchUpRequested.get() + 1).also(preferences.catchUpRequested::set)
         }
         val workRequest = OneTimeWorkRequestBuilder<LibrarySyncWorker>()
             .setConstraints(constraints())
-            .setInputData(workDataOf(LibrarySyncWorker.KEY_FROM_CHANGE to fromChange))
+            .setInputData(
+                workDataOf(LibrarySyncWorker.KEY_CATCH_UP to true, LibrarySyncWorker.KEY_FROM_CHANGE to fromChange),
+            )
             .addTag(CATCH_UP_WORK_NAME)
             .build()
-        // Appended behind a running catch-up, which may have started its sync before this change
-        WorkManager.getInstance(context)
-            .enqueueUniqueWork(CATCH_UP_WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, workRequest)
+        // Independent of other catch-ups, which may have started their sync before this change or may fail; those
+        // that find their requests synced by another sync end right away
+        WorkManager.getInstance(context).enqueue(workRequest)
         return request
     }
 
@@ -404,6 +421,7 @@ class LibrarySyncWorker(context: Context, workerParams: WorkerParameters) : Coro
 
     override suspend fun doWork(): Result {
         val outcome = applicationContext.appGraph.libraryAutoSync.runWork(
+            catchUp = inputData.getBoolean(KEY_CATCH_UP, false),
             catchUpFromChange = inputData.getBoolean(KEY_FROM_CHANGE, false),
             runAttemptCount = runAttemptCount,
         )
@@ -415,6 +433,7 @@ class LibrarySyncWorker(context: Context, workerParams: WorkerParameters) : Coro
     }
 
     companion object {
+        const val KEY_CATCH_UP = "catch_up"
         const val KEY_FROM_CHANGE = "from_change"
     }
 }
