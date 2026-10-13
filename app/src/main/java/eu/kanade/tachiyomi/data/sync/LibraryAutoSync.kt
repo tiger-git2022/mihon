@@ -398,7 +398,10 @@ class LibraryAutoSync(
      */
     private fun enqueueCatchUpWork(fromChange: Boolean): Long {
         val request = synchronized(lock) {
-            (preferences.catchUpRequested.get() + 1).also(preferences.catchUpRequested::set)
+            (preferences.catchUpRequested.get() + 1).also {
+                preferences.catchUpRequested.set(it)
+                if (!fromChange) preferences.catchUpRetryRequested.set(it)
+            }
         }
         // Independent of other catch-ups, which may have started their sync before this change or may fail; those
         // that find their requests synced by another sync end right away
@@ -409,8 +412,12 @@ class LibraryAutoSync(
     /** Replaces the queued catch-ups by one with the current network constraint. */
     private fun requeueCatchUpWork() {
         val workManager = WorkManager.getInstance(context)
+        // Still skipped with "sync after changes" off, unless a pending request retries a failed sync
+        val fromChange = synchronized(lock) {
+            preferences.catchUpRetryRequested.get() <= preferences.catchUpSynced.get()
+        }
         workManager.cancelAllWorkByTag(CATCH_UP_WORK_NAME)
-        workManager.enqueue(catchUpWorkRequest(fromChange = false))
+        workManager.enqueue(catchUpWorkRequest(fromChange))
     }
 
     private fun catchUpWorkRequest(fromChange: Boolean) = OneTimeWorkRequestBuilder<LibrarySyncWorker>()
