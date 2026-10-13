@@ -14,6 +14,7 @@ import com.microsoft.identity.client.ISingleAccountPublicClientApplication
 import com.microsoft.identity.client.PublicClientApplication
 import com.microsoft.identity.client.SignInParameters
 import com.microsoft.identity.client.exception.MsalException
+import com.microsoft.identity.client.exception.MsalUiRequiredException
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -147,7 +148,7 @@ class OneDriveSyncClient(
 
         httpClient.newCall(request).await().use { response ->
             when {
-                response.code == 412 -> throw OneDriveSyncException(
+                response.code == 412 -> throw OneDriveSyncConflictException(
                     "The OneDrive sync file changed on another device. Sync again to merge the latest copy.",
                 )
                 !response.isSuccessful -> throw response.toGraphException("upload", fileName)
@@ -250,8 +251,10 @@ class OneDriveSyncClient(
                         .build(),
                 ).accessToken
             }
+        } catch (e: MsalUiRequiredException) {
+            throw OneDriveSyncAuthException("Microsoft sign-in has expired. Sign in again.", e)
         } catch (e: MsalException) {
-            throw OneDriveSyncException("Microsoft sign-in has expired. Sign in again.", e)
+            throw OneDriveSyncException("Could not get a Microsoft sign-in token: ${e.message}", e)
         }
     }
 
@@ -353,4 +356,10 @@ data class OneDriveSyncDocument(
     val etag: String?,
 )
 
-class OneDriveSyncException(message: String, cause: Throwable? = null) : IOException(message, cause)
+open class OneDriveSyncException(message: String, cause: Throwable? = null) : IOException(message, cause)
+
+/** Another device wrote the sync file between our read and write (HTTP 412). */
+class OneDriveSyncConflictException(message: String) : OneDriveSyncException(message)
+
+/** Signing in again needs the user; background syncs stop retrying. */
+class OneDriveSyncAuthException(message: String, cause: Throwable? = null) : OneDriveSyncException(message, cause)

@@ -8,7 +8,8 @@ import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
 import java.util.UUID
 
-// All keys are app state keys: they belong to this installation and are never part of backups.
+// All keys are app state keys: they belong to this installation and are never part of backups, so restoring
+// another device's settings keeps this device's sync options.
 @Inject
 @SingleIn(AppScope::class)
 class LibrarySyncPreferences(
@@ -40,6 +41,33 @@ class LibrarySyncPreferences(
         defaultDeviceName(),
     )
 
+    // Automatic sync, see LibraryAutoSync
+
+    val autoSync = preferenceStore.getBoolean(Preference.appStateKey("library_sync_auto_enabled"), true)
+
+    val autoSyncIntervalMinutes = preferenceStore.getInt(
+        Preference.appStateKey("library_sync_auto_interval_minutes"),
+        DEFAULT_AUTO_SYNC_INTERVAL_MINUTES,
+    )
+
+    val autoSyncWifiOnly = preferenceStore.getBoolean(Preference.appStateKey("library_sync_auto_wifi_only"), false)
+
+    val syncOnChange = preferenceStore.getBoolean(Preference.appStateKey("library_sync_auto_on_change"), true)
+
+    /**
+     * Catch-up syncs in WorkManager: the number of the latest request, and the latest request a finished sync covered.
+     * Both only grow, so a request is never mistaken for an older one. Kept on disk, since the queued work outlives
+     * the process.
+     */
+    val catchUpRequested = preferenceStore.getLong(Preference.appStateKey("library_sync_catch_up_requested"), 0L)
+    val catchUpSynced = preferenceStore.getLong(Preference.appStateKey("library_sync_catch_up_synced"), 0L)
+
+    /** The latest catch-up request that retries a failed sync rather than syncing changes. */
+    val catchUpRetryRequested = preferenceStore.getLong(
+        Preference.appStateKey("library_sync_catch_up_retry_requested"),
+        0L,
+    )
+
     fun currentDevice(): SyncDevice {
         val id = deviceId.get().ifBlank {
             UUID.randomUUID().toString().also(deviceId::set)
@@ -57,6 +85,13 @@ class LibrarySyncPreferences(
             model.startsWith(manufacturer, ignoreCase = true) -> model
             else -> "$manufacturer $model"
         }.trim().ifBlank { "Android" }
+    }
+
+    companion object {
+        const val DEFAULT_AUTO_SYNC_INTERVAL_MINUTES = 360
+
+        /** WorkManager runs periodic work at most every 15 minutes. */
+        val AUTO_SYNC_INTERVALS_MINUTES = listOf(15, 30, 60, 180, 360, 720, 1440)
     }
 }
 

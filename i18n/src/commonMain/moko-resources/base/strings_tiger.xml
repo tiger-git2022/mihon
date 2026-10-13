@@ -20,7 +20,7 @@
     <string name="library_sync_sign_out_failed">OneDrive sign-out failed: %s</string>
     <string name="library_sync_success">Sync complete: %1$d added, %2$d removed, %3$d in library</string>
     <string name="library_sync_failed">Library sync failed: %s</string>
-    <string name="library_sync_info">Syncs library additions and removals, global search history, \"read before\" marks and a settings backup per device through the app\'s private OneDrive folder. Sign in with the same Microsoft account on each device and sync one device at a time. Categories, reading progress and downloads are not synchronized.</string>
+    <string name="library_sync_info">Syncs library additions and removals, global search history, \"read before\" marks and a settings backup per device through the app\'s private OneDrive folder. Sign in with the same Microsoft account on each device; changes from another device are merged when they arrive at the same time. Categories, reading progress and downloads are not synchronized.</string>
     <string name="library_sync_redirect_uri">Azure redirect URI of this build: %s</string>
 
     <!-- Multi-device sync -->
@@ -45,4 +45,16 @@
     <string name="library_sync_step_marks">Read marks</string>
     <string name="library_sync_step_settings_create">Creating settings backup</string>
     <string name="library_sync_step_settings_upload">Uploading settings backup</string>
+
+    <!-- Automatic sync -->
+    <string name="library_sync_auto">Automatic sync</string>
+    <string name="library_sync_auto_summary">Syncs when the app starts and at the interval below. When off, only syncs when you tap sync.</string>
+    <string name="library_sync_auto_interval">Sync interval</string>
+    <string name="library_sync_auto_interval_summary">%s. Android may run it a little later to save battery.</string>
+    <string name="library_sync_auto_interval_minutes">Every %d minutes</string>
+    <string name="library_sync_auto_interval_hours">Every %d h</string>
+    <string name="library_sync_on_change">Sync after changes</string>
+    <string name="library_sync_on_change_summary">Syncs 60 s after the last change to the library, search history, read marks or settings, at most 5 min after the first one.</string>
+    <string name="library_sync_wifi_only">Only on Wi-Fi</string>
+    <string name="library_sync_wifi_only_summary">Automatic syncs wait for an unmetered network. Sync now always works.</string>
 </resources>

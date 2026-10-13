@@ -26,6 +26,7 @@ internal fun RowScope.ReadMarkActionButton(manga: Manga) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val service = remember { context.appGraph.librarySyncService }
+    val autoSync = remember { context.appGraph.libraryAutoSync }
     val status = rememberMangaMarkStatus(manga.source, manga.url)
 
     MangaActionButton(
@@ -39,6 +40,7 @@ internal fun RowScope.ReadMarkActionButton(manga: Manga) {
         onClick = {
             scope.launch {
                 runCatching { service.setRead(manga, !status.read) }
+                    .onSuccess { autoSync.notifyChanged() }
                     .onFailure { context.toast(it.message) }
             }
         },

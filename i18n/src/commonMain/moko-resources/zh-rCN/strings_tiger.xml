@@ -16,7 +16,7 @@
     <string name="library_sync_sign_out_failed">退出 OneDrive 登录失败：%s</string>
     <string name="library_sync_success">同步完成：添加 %1$d 部，移除 %2$d 部，书架共 %3$d 部</string>
     <string name="library_sync_failed">书架同步失败：%s</string>
-    <string name="library_sync_info">通过应用专属的 OneDrive 文件夹同步书架的添加和移除、全局搜索记录、“看过”标记，并为每台设备保存一份设置备份。在每台设备上登录同一个微软账号，并依次同步，不要同时同步。分类、阅读进度和下载不会同步。</string>
+    <string name="library_sync_info">通过应用专属的 OneDrive 文件夹同步书架的添加和移除、全局搜索记录、“看过”标记，并为每台设备保存一份设置备份。在每台设备上登录同一个微软账号；多台设备同时同步时会自动合并。分类、阅读进度和下载不会同步。</string>
     <string name="library_sync_redirect_uri">本安装包的 Azure 重定向 URI：%s</string>
     <string name="sync_from_device">来自 %s</string>
     <string name="library_sync_partial_failure">%1$s。部分内容同步失败：%2$s</string>
@@ -35,4 +35,16 @@
     <string name="library_sync_step_marks">看过标记</string>
     <string name="library_sync_step_settings_create">生成设置备份</string>
     <string name="library_sync_step_settings_upload">上传设置备份</string>
+
+    <!-- 自动同步 -->
+    <string name="library_sync_auto">自动同步</string>
+    <string name="library_sync_auto_summary">打开应用时同步一次，之后按下面的间隔定时同步。关闭后只在你点同步时同步。</string>
+    <string name="library_sync_auto_interval">同步间隔</string>
+    <string name="library_sync_auto_interval_summary">%s。系统为了省电，可能会稍微推迟。</string>
+    <string name="library_sync_auto_interval_minutes">每 %d 分钟</string>
+    <string name="library_sync_auto_interval_hours">每 %d 小时</string>
+    <string name="library_sync_on_change">数据变化后同步</string>
+    <string name="library_sync_on_change_summary">书架、搜索记录、看过标记或设置改动后，60 秒内没有新改动就同步；从第一次改动算起最多等 5 分钟。</string>
+    <string name="library_sync_wifi_only">仅在 Wi-Fi 下自动同步</string>
+    <string name="library_sync_wifi_only_summary">自动同步会等到连上不计流量的网络。“立即同步”不受限制。</string>
 </resources>
