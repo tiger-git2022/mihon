@@ -54,8 +54,11 @@ class LibrarySyncPreferences(
 
     val syncOnChange = preferenceStore.getBoolean(Preference.appStateKey("library_sync_auto_on_change"), true)
 
-    /** Changes wait for a catch-up sync in WorkManager. Kept on disk, since the queued work outlives the process. */
-    val catchUpPending = preferenceStore.getBoolean(Preference.appStateKey("library_sync_catch_up_pending"), false)
+    /**
+     * Number of the latest catch-up sync request, 0 when no changes wait for one in WorkManager. Kept on disk, since
+     * the queued work outlives the process.
+     */
+    val catchUpRequest = preferenceStore.getLong(Preference.appStateKey("library_sync_catch_up_request"), 0L)
 
     fun currentDevice(): SyncDevice {
         val id = deviceId.get().ifBlank {

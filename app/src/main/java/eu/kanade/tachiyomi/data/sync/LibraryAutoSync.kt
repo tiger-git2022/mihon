@@ -115,8 +115,15 @@ class LibraryAutoSync(
     private val isChangeSyncAllowed: Boolean
         get() = isAllowed && preferences.syncOnChange.get()
 
-    private fun takeCatchUpRequest(): Boolean = synchronized(lock) {
-        preferences.catchUpPending.get().also { if (it) preferences.catchUpPending.set(false) }
+    /**
+     * Clears the catch-up request [seen] when a sync started, once that sync finished. A newer request came from a
+     * change the sync may have missed, so it stays. A sync stopped by WorkManager or a killed process clears nothing,
+     * so its rerun still syncs.
+     */
+    private fun clearCatchUpRequest(seen: Long) {
+        synchronized(lock) {
+            if (seen != 0L && preferences.catchUpRequest.get() == seen) preferences.catchUpRequest.set(0L)
+        }
     }
 
     /** Called once from the Application. */
@@ -222,9 +229,9 @@ class LibraryAutoSync(
         if (!isAllowed || (catchUpFromChange && !preferences.syncOnChange.get())) return WorkOutcome.SUCCESS
         // Queued with a network constraint from before "only on Wi-Fi" was turned on
         if (!isNetworkAllowed()) return WorkOutcome.RETRY
-        val pending = takeCatchUpRequest()
+        val request = preferences.catchUpRequest.get()
         // Catch-up work is appended behind running work; an earlier one in the chain already synced these changes
-        if (catchUpFromChange && !pending) return WorkOutcome.SUCCESS
+        if (catchUpFromChange && request == 0L) return WorkOutcome.SUCCESS
         val outcome = try {
             // Background syncs show nothing
             val result = service.sync()
@@ -239,8 +246,8 @@ class LibraryAutoSync(
             logcat(LogPriority.ERROR, e)
             retryOrFail(runAttemptCount)
         }
-        // The retry still has these changes to sync
-        if (outcome == WorkOutcome.RETRY && pending) preferences.catchUpPending.set(true)
+        // A retry still has these changes to sync
+        if (outcome != WorkOutcome.RETRY) clearCatchUpRequest(request)
         return outcome
     }
 
@@ -249,13 +256,15 @@ class LibraryAutoSync(
     }
 
     private suspend fun onSyncFinished() {
-        val rerun = synchronized(lock) {
-            pendingAfterSync.also { pendingAfterSync = false }
-        }
         // Library changes made while the sync ran were not counted, see observeLibrary. Only checked when the
         // library was written meanwhile: a library that differs from the synced state without any write (if the
         // sync could not apply an entry) must not start a sync after every sync.
-        val libraryWritten = libraryChangedDuringSync.also { libraryChangedDuringSync = false }
+        val (rerun, libraryWritten) = synchronized(lock) {
+            (pendingAfterSync to libraryChangedDuringSync).also {
+                pendingAfterSync = false
+                libraryChangedDuringSync = false
+            }
+        }
         if (rerun || (libraryWritten && libraryChangedSinceSync())) notifyChanged()
     }
 
@@ -272,10 +281,11 @@ class LibraryAutoSync(
                 val previous = knownFavorites
                 knownFavorites = keys
                 if (keys == null || previous == null || keys == previous) return@onEach
-                if (service.isSyncing) {
-                    libraryChangedDuringSync = true
-                    return@onEach
+                // Checked and set under the lock, so onSyncFinished cannot read the flag in between
+                val duringSync = synchronized(lock) {
+                    service.isSyncing.also { if (it) libraryChangedDuringSync = true }
                 }
+                if (duringSync) return@onEach
                 // A late emission of what the sync itself wrote matches the state after the sync
                 if (libraryChangedSinceSync()) notifyChanged()
             }
@@ -338,13 +348,15 @@ class LibraryAutoSync(
      * changes, which is skipped if "sync after changes" is turned off meanwhile, from a retry of a failed sync.
      */
     private fun enqueueCatchUpWork(fromChange: Boolean) {
-        preferences.catchUpPending.set(true)
+        synchronized(lock) {
+            preferences.catchUpRequest.set(preferences.catchUpRequest.get() + 1)
+        }
         val request = OneTimeWorkRequestBuilder<LibrarySyncWorker>()
             .setConstraints(constraints())
             .setInputData(workDataOf(LibrarySyncWorker.KEY_FROM_CHANGE to fromChange))
             .addTag(CATCH_UP_WORK_NAME)
             .build()
-        // Appended behind a running catch-up, which may have read the pending flag already
+        // Appended behind a running catch-up, which may have started its sync before this change
         WorkManager.getInstance(context)
             .enqueueUniqueWork(CATCH_UP_WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
     }
