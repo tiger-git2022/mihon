@@ -77,9 +77,9 @@ class LibraryAutoSync(
     /** A change arrived while a sync ran; it is synced after it. */
     private var pendingAfterSync = false
 
-    /** Foreground syncs running now, and whether all of them sync changes. */
+    /** Foreground syncs running now, and how many of them do not only sync changes. */
     private var foregroundSyncs = 0
-    private var foregroundSyncsFromChange = false
+    private var foregroundSyncsNotFromChange = 0
 
     /** Catch-up request made for the running foreground sync when the app went to the background, 0 without one. */
     private var handoffRequest = 0L
@@ -153,6 +153,13 @@ class LibraryAutoSync(
             .drop(1)
             .onEach { if (isAllowed && isCatchUpPending()) requeueCatchUpWork() }
             .launchIn(scope)
+        // Signing in or switching accounts syncs right away: the launch sync may have passed while signed out, and
+        // the periodic sync only starts after a full interval
+        preferences.accountId.changes()
+            .distinctUntilChanged()
+            .drop(1)
+            .onEach { accountId -> if (accountId.isNotBlank() && isAllowed) syncNowOrLater(fromChange = false) }
+            .launchIn(scope)
         observeLibrary()
         service.finished
             .onEach { onSyncFinished() }
@@ -188,7 +195,7 @@ class LibraryAutoSync(
             }
             // The process may be killed before the running sync ends; the request is withdrawn if it ends well
             if (foregroundSyncs == 0 || handoffRequest != 0L) return
-            val fromChange = foregroundSyncsFromChange
+            val fromChange = foregroundSyncsNotFromChange == 0
             if (if (fromChange) isChangeSyncAllowed else isAllowed) {
                 handoffRequest = enqueueCatchUpWork(fromChange)
             }
@@ -231,8 +238,8 @@ class LibraryAutoSync(
             return
         }
         synchronized(lock) {
-            foregroundSyncsFromChange = fromChange && (foregroundSyncs == 0 || foregroundSyncsFromChange)
             foregroundSyncs++
+            if (!fromChange) foregroundSyncsNotFromChange++
         }
         var synced = false
         var requestAtStart = 0L
@@ -256,6 +263,7 @@ class LibraryAutoSync(
         } finally {
             val handoff = synchronized(lock) {
                 foregroundSyncs--
+                if (!fromChange) foregroundSyncsNotFromChange--
                 if (foregroundSyncs == 0) handoffRequest.also { handoffRequest = 0L } else 0L
             }
             if (synced) {
@@ -398,7 +406,10 @@ class LibraryAutoSync(
      */
     private fun enqueueCatchUpWork(fromChange: Boolean): Long {
         val request = synchronized(lock) {
-            (preferences.catchUpRequested.get() + 1).also(preferences.catchUpRequested::set)
+            (preferences.catchUpRequested.get() + 1).also {
+                preferences.catchUpRequested.set(it)
+                if (!fromChange) preferences.catchUpRetryRequested.set(it)
+            }
         }
         // Independent of other catch-ups, which may have started their sync before this change or may fail; those
         // that find their requests synced by another sync end right away
@@ -409,8 +420,12 @@ class LibraryAutoSync(
     /** Replaces the queued catch-ups by one with the current network constraint. */
     private fun requeueCatchUpWork() {
         val workManager = WorkManager.getInstance(context)
+        // Still skipped with "sync after changes" off, unless a pending request retries a failed sync
+        val fromChange = synchronized(lock) {
+            preferences.catchUpRetryRequested.get() <= preferences.catchUpSynced.get()
+        }
         workManager.cancelAllWorkByTag(CATCH_UP_WORK_NAME)
-        workManager.enqueue(catchUpWorkRequest(fromChange = false))
+        workManager.enqueue(catchUpWorkRequest(fromChange))
     }
 
     private fun catchUpWorkRequest(fromChange: Boolean) = OneTimeWorkRequestBuilder<LibrarySyncWorker>()

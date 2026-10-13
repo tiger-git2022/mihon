@@ -75,6 +75,12 @@ class LibrarySyncPreferences(
     val catchUpRequested = preferenceStore.getLong(Preference.appStateKey("library_sync_catch_up_requested"), 0L)
     val catchUpSynced = preferenceStore.getLong(Preference.appStateKey("library_sync_catch_up_synced"), 0L)
 
+    /** The latest catch-up request that retries a failed sync rather than syncing changes. */
+    val catchUpRetryRequested = preferenceStore.getLong(
+        Preference.appStateKey("library_sync_catch_up_retry_requested"),
+        0L,
+    )
+
     fun currentDevice(): SyncDevice {
         val id = deviceId.get().ifBlank {
             UUID.randomUUID().toString().also(deviceId::set)

@@ -17,7 +17,7 @@
   - 全局搜索记录（标注来自哪台设备）；
   - “看过”标记；
   - 本机设置备份（每台设备一份，可在“从 OneDrive 恢复设置”里选择任一设备的备份恢复；不含书架、历史和登录信息）。
-  - 自动同步（默认开启，可关闭）：打开应用时同步一次；按间隔定时同步（15 分钟到 24 小时可选，默认 6 小时）；书架、搜索记录、看过标记或设置改动后，60 秒内没有新改动就同步，最多等 5 分钟；可选“仅在 Wi-Fi 下自动同步”。这些选项只保存在本机，恢复别的设备的设置时不会被覆盖。
+  - 自动同步（默认开启，可关闭）：打开应用时、登录或切换微软账号后各同步一次；按间隔定时同步（15 分钟到 24 小时可选，默认 6 小时）；书架、搜索记录、看过标记或设置改动后，60 秒内没有新改动就同步，最多等 5 分钟；可选“仅在 Wi-Fi 下自动同步”。这些选项只保存在本机，恢复别的设备的设置时不会被覆盖。
 - **全局搜索记录**：双栏显示，长关键词自动换行。
 - **“看过”标记**：漫画详情页的“标记看过”按钮，和书架互不影响（移出书架后仍保留）。浏览书源和全局搜索结果的封面上用眼睛角标显示。E-Hentai 系画廊按画廊 ID 匹配，E-Hentai 和 ExHentai 通用。
 - **EhViewer 收藏标记**：配合 [EhViewer 改版](https://github.com/tiger-git2022/ehviewer-onedrive)，两边登录同一个微软账号即可。同步时读取 EhViewer 上传的收藏清单（`ehviewer/export/favorites-index.json.gz`），在浏览书源、全局搜索的封面上显示“本地”或“云:收藏夹名”角标，详情页多一个按钮，点开能看到匹配到的 EhViewer 画廊，并可在 EhViewer 中打开。E-Hentai 系书源按画廊 ID 匹配；其他书源按标题匹配，会忽略各种括号和其中的作者、语言、汉化组等标签（汉化组写在最前面也能认出作者），统一全角半角、繁简（Android 10 及以上）和日文字形（桜/樱、気/气），“催○”这类和谐字当作任意字符，日文标题和罗马音标题都参与比较。卷数不同、同系列只差一个汉字（宮島桜の場合/宮島椿の場合）的不算同一本；作者相同时，只写了主标题（哔咔常见）也能对上。可在书架同步设置里关闭。
@@ -121,7 +121,7 @@ Personal fork of [mihonapp/mihon](https://github.com/mihonapp/mihon). The `custo
   - global search history (labelled with the device it came from);
   - "read before" marks;
   - a settings backup per device (restore any device's backup from "Restore settings from OneDrive"; library, history and logins are not included).
-  - automatic sync (on by default): once at app start, periodically (15 min to 24 h, default 6 h), and 60 s after the last change to the library, search history, marks or settings (at most 5 min after the first); optionally only on Wi-Fi. These options stay on the device and are not changed by restoring another device's settings.
+  - automatic sync (on by default): once at app start and after signing in or switching accounts, periodically (15 min to 24 h, default 6 h), and 60 s after the last change to the library, search history, marks or settings (at most 5 min after the first); optionally only on Wi-Fi. These options stay on the device and are not changed by restoring another device's settings.
 - **Global search history** in two columns; long queries wrap.
 - **"Read before" mark**: a button on the manga details page, independent of the library (kept after removing from the library). Shown as an eye badge on covers in Browse and global search. E-Hentai galleries match by gallery ID, so E-Hentai and ExHentai share marks.
 - **EhViewer favorite marks**: with the [EhViewer fork](https://github.com/tiger-git2022/ehviewer-onedrive) signed in to the same Microsoft account, a sync reads the favorites list EhViewer uploads (`ehviewer/export/favorites-index.json.gz`). Covers in Browse and global search get a "Local" or "Cloud: slot name" badge, and the details page gets a button listing the matching EhViewer galleries, which open in EhViewer. E-Hentai sources match by gallery ID; other sources match by title, ignoring brackets and the artist, language and translator tags in them (also with the translator group first), full-width/half-width, traditional/simplified Chinese (Android 10+) and Japanese character forms (桜/樱), with censor marks like "催○" matching any character; Japanese and romanized titles both count. Different volume numbers or one different kanji (another book of a series) do not match; with the same artist a title shortened to its main part does. Can be turned off in the library sync settings.
