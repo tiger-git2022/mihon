@@ -5,13 +5,12 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import eu.kanade.domain.source.interactor.SetMigrateSorting
 import eu.kanade.tachiyomi.util.system.LocaleHelper
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import mihon.domain.extension.model.ContentWarning
 import mihon.domain.migration.models.MigrationFlag
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.core.common.preference.getEnum
+import tachiyomi.core.common.preference.getEnumSet
 import tachiyomi.core.common.preference.getLongArray
 import tachiyomi.domain.library.model.LibraryDisplayMode
 
@@ -44,7 +43,15 @@ class SourcePreferences(
         -1,
     )
 
-    val showNsfwSource: Preference<Boolean> = preferenceStore.getBoolean("show_nsfw_source", true)
+    val enabledContentWarnings: Preference<Set<ContentWarning>> = preferenceStore.getEnumSet(
+        "enabled_content_warnings",
+        setOf(ContentWarning.SAFE, ContentWarning.MIXED, ContentWarning.NSFW),
+    )
+
+    val applyContentWarningsToInstalled: Preference<Boolean> = preferenceStore.getBoolean(
+        "apply_content_warnings_to_installed",
+        true,
+    )
 
     val migrationSortingMode: Preference<SetMigrateSorting.Mode> = preferenceStore.getEnum(
         "pref_migration_sorting",
@@ -71,27 +78,6 @@ class SourcePreferences(
         Preference.appStateKey("has_filters_toggle_state"),
         false,
     )
-
-    val globalSearchHistory: Preference<List<String>> = preferenceStore.getObjectFromString(
-        key = "global_search_history",
-        defaultValue = emptyList(),
-        serializer = { Json.encodeToString(it) },
-        deserializer = { Json.decodeFromString(it) },
-    )
-
-    private val legacyGlobalSearchHistory: Preference<List<String>> = preferenceStore.getObjectFromString(
-        key = Preference.appStateKey("global_search_history"),
-        defaultValue = emptyList(),
-        serializer = { Json.encodeToString(it) },
-        deserializer = { Json.decodeFromString(it) },
-    )
-
-    init {
-        if (!globalSearchHistory.isSet() && legacyGlobalSearchHistory.isSet()) {
-            globalSearchHistory.set(legacyGlobalSearchHistory.get())
-            legacyGlobalSearchHistory.delete()
-        }
-    }
 
     val migrationSources: Preference<List<Long>> = preferenceStore.getLongArray("migration_sources", emptyList())
 

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="recent_searches">最近搜索</string>
+    <string name="clear_search_history">清空搜索历史</string>
+    <string name="library_sync">书架同步</string>
+    <string name="library_sync_not_signed_in">尚未登录 OneDrive</string>
+    <string name="library_sync_signed_in_as">OneDrive：%s</string>
+    <string name="library_sync_sign_in">登录 OneDrive</string>
+    <string name="library_sync_signing_in">正在登录…</string>
+    <string name="library_sync_sign_in_success">已登录 OneDrive</string>
+    <string name="library_sync_sign_in_failed">OneDrive 登录失败：%s</string>
+    <string name="library_sync_now">立即同步</string>
+    <string name="library_sync_syncing">正在同步…</string>
+    <string name="library_sync_sign_out">退出 OneDrive 登录</string>
+    <string name="library_sync_sign_out_success">已退出 OneDrive 登录</string>
+    <string name="library_sync_sign_out_failed">退出 OneDrive 登录失败：%s</string>
+    <string name="library_sync_success">同步完成：添加 %1$d 部，移除 %2$d 部，书架共 %3$d 部</string>
+    <string name="library_sync_failed">书架同步失败：%s</string>
+    <string name="library_sync_info">将书架的添加和移除记录保存在应用专属的 OneDrive 文件夹中。在每台设备上登录同一个微软账号，并依次同步，不要同时同步。分类、阅读进度、下载和搜索历史不会同步。</string>
+    <string name="library_sync_redirect_uri">本安装包的 Azure 重定向 URI：%s</string>
+</resources>

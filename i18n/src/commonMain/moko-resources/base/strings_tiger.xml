@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fork-only strings (tiger-git2022/mihon). Kept separate from strings.xml to avoid merge conflicts with upstream. -->
+<resources>
+    <!-- Global search history -->
+    <string name="recent_searches">Recent searches</string>
+    <string name="clear_search_history">Clear search history</string>
+
+    <!-- Library sync -->
+    <string name="library_sync">Library sync</string>
+    <string name="library_sync_not_signed_in">Not signed in to OneDrive</string>
+    <string name="library_sync_signed_in_as">OneDrive: %s</string>
+    <string name="library_sync_sign_in">Sign in to OneDrive</string>
+    <string name="library_sync_signing_in">Signing in…</string>
+    <string name="library_sync_sign_in_success">Signed in to OneDrive</string>
+    <string name="library_sync_sign_in_failed">OneDrive sign-in failed: %s</string>
+    <string name="library_sync_now">Sync now</string>
+    <string name="library_sync_syncing">Syncing…</string>
+    <string name="library_sync_sign_out">Sign out of OneDrive</string>
+    <string name="library_sync_sign_out_success">Signed out of OneDrive</string>
+    <string name="library_sync_sign_out_failed">OneDrive sign-out failed: %s</string>
+    <string name="library_sync_success">Sync complete: %1$d added, %2$d removed, %3$d in library</string>
+    <string name="library_sync_failed">Library sync failed: %s</string>
+    <string name="library_sync_info">Stores library additions and removals in the app\'s private OneDrive folder. Sign in with the same Microsoft account on each device and sync one device at a time. Categories, reading progress, downloads, and search history are not synchronized.</string>
+    <string name="library_sync_redirect_uri">Azure redirect URI of this build: %s</string>
+</resources>

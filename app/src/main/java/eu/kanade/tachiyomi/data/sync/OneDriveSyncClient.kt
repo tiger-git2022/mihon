@@ -2,6 +2,9 @@ package eu.kanade.tachiyomi.data.sync
 
 import android.app.Activity
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import android.util.Base64
 import android.util.Log
 import com.microsoft.identity.client.AcquireTokenSilentParameters
 import com.microsoft.identity.client.AuthenticationCallback
@@ -26,7 +29,10 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import org.json.JSONObject
+import java.io.File
 import java.io.IOException
+import java.net.URLEncoder
+import java.security.MessageDigest
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -42,6 +48,17 @@ class OneDriveSyncClient(
 
     @Volatile
     private var application: ISingleAccountPublicClientApplication? = null
+
+    /**
+     * MSAL redirect URI of this installation: `msauth://<package name>/<URL-encoded signature hash>`.
+     *
+     * It is derived from the installed package instead of being hard-coded, so debug and release
+     * builds (different application IDs and signing keys) both work. Every value must also be
+     * registered in the Azure app registration.
+     */
+    val redirectUri: String by lazy {
+        "msauth://${applicationContext.packageName}/${URLEncoder.encode(signatureHash(), "UTF-8")}"
+    }
 
     suspend fun currentAccount(): OneDriveAccount? {
         val account = withContext(Dispatchers.IO) {
@@ -162,13 +179,43 @@ class OneDriveSyncClient(
                 withContext(Dispatchers.IO) {
                     PublicClientApplication.createSingleAccountPublicClientApplication(
                         applicationContext,
-                        R.raw.auth_config_single_account,
+                        writeConfigFile(),
                     )
                 }.also { application = it }
             } catch (e: MsalException) {
                 throw OneDriveSyncException("Could not initialize Microsoft sign-in", e)
             }
         }
+    }
+
+    /**
+     * Writes the MSAL configuration from `res/raw/auth_config_single_account.json`, with
+     * [redirectUri] filled in for this installation.
+     */
+    private fun writeConfigFile(): File {
+        val template = applicationContext.resources.openRawResource(R.raw.auth_config_single_account)
+            .bufferedReader()
+            .use { it.readText() }
+        val config = JSONObject(template).put("redirect_uri", redirectUri)
+        return File(applicationContext.noBackupFilesDir, "msal_auth_config.json")
+            .apply { writeText(config.toString()) }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun signatureHash(): String {
+        val packageManager = applicationContext.packageManager
+        val packageName = applicationContext.packageName
+        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+                .signingInfo
+                ?.apkContentsSigners
+        } else {
+            packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNATURES).signatures
+        }
+        val signature = signatures?.firstOrNull()
+            ?: throw OneDriveSyncException("Could not read the app signing certificate")
+        val digest = MessageDigest.getInstance("SHA").digest(signature.toByteArray())
+        return Base64.encodeToString(digest, Base64.NO_WRAP)
     }
 
     private fun IAccount.toOneDriveAccount() = OneDriveAccount(

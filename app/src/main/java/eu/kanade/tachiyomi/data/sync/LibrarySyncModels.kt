@@ -4,6 +4,7 @@ import eu.kanade.tachiyomi.source.model.UpdateStrategy
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 import tachiyomi.domain.manga.model.Manga
+import kotlin.time.Instant
 
 @Serializable
 data class LibrarySyncFile(
@@ -62,8 +63,7 @@ data class LibrarySyncManga(
             thumbnailUrl = thumbnailUrl,
             updateStrategy = strategy,
             initialized = initialized,
-            favorite = true,
-            dateAdded = now,
+            favoriteAt = Instant.fromEpochMilliseconds(now),
         )
     }
 

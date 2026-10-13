@@ -115,6 +115,9 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
+        <!-- Fork: MSAL (OneDrive sign-in) redirect, msauth://<application id>/<signature hash>.
+             The host follows the build type's application ID; the path (signature hash) depends on
+             the signing key, so any path is accepted and OneDriveSyncClient computes the full URI. -->
         <activity
             android:name="com.microsoft.identity.client.BrowserTabActivity"
             android:exported="true">
@@ -125,8 +128,8 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data
-                    android:host="app.mihon.dev"
-                    android:path="/HrLgSH3tTFq1KFxzXlgszundt4s="
+                    android:host="${applicationId}"
+                    android:pathPrefix="/"
                     android:scheme="msauth" />
             </intent-filter>
         </activity>
@@ -213,6 +216,17 @@
                 <data android:host="myanimelist-auth" />
                 <data android:host="shikimori-auth" />
                 <data android:host="hikka-auth" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <!-- Comick requires native reverse-domain schemes  -->
+                <data android:scheme="app.mihon" />
+                <data android:host="comick-auth" />
             </intent-filter>
         </activity>
 
