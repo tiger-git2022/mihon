@@ -7,7 +7,8 @@ import kotlin.math.ceil
 /**
  * Turns gallery and manga titles into comparable keys, so the same work matches across sites that write its title
  * differently (fork-only feature):
- * - full-width and half-width forms, upper and lower case, traditional and simplified Chinese ([toSimplified]) are
+ * - full-width and half-width forms, upper and lower case, traditional and simplified Chinese ([toSimplified]) and
+ *   Japanese forms of Chinese characters (桜/樱, 気/气, which sites converting titles to simplified Chinese use) are
  *   unified;
  * - bracketed parts (event, circle and artist, parody, language, translator: `(C102) [Circle (Artist)] Title (Parody)
  *   [Chinese]`, also with 【】 or full-width brackets) are dropped, and `English | Japanese` titles are split;
@@ -31,15 +32,27 @@ class EhTitleNormalizer(private val toSimplified: (String) -> String = { it }) {
         return parts.ifEmpty { listOf(clean(text)).filter { it.length >= MIN_KEY_LENGTH } }.distinct()
     }
 
-    /** Circle and artist of an E-Hentai style title: the first [...] group, after an optional (event). */
+    /**
+     * Circles and artists of an E-Hentai style title: the [...] groups before the title, `[Circle (Artist)]` giving
+     * both. Events `(C102)` and translator groups (`[脸肿汉化组]`, which some sites put first) are skipped.
+     */
     fun artists(title: String): Set<String> {
-        val text = Normalizer.normalize(title, Normalizer.Form.NFKC)
-        val group = LEADING_GROUP.find(text)?.groupValues?.get(1) ?: return emptySet()
-        val inner = INNER_PARENS.find(group)
-        val names = if (inner != null) {
-            listOf(group.substring(0, inner.range.first), inner.groupValues[1])
-        } else {
-            listOf(group)
+        var rest = Normalizer.normalize(title, Normalizer.Form.NFKC)
+        val names = ArrayList<String>()
+        while (true) {
+            val match = LEADING_GROUP.find(rest) ?: break
+            rest = rest.substring(match.range.last + 1)
+            val group = match.value.trim()
+            if (group.startsWith("(")) continue
+            val inner = group.substring(1, group.length - 1)
+            if (TRANSLATOR.containsMatchIn(inner)) continue
+            val parens = INNER_PARENS.find(inner)
+            if (parens != null) {
+                names += inner.substring(0, parens.range.first)
+                names += parens.groupValues[1]
+            } else {
+                names += inner
+            }
         }
         return names.flatMap { it.split(',', '、', '&') }.map(::clean).filter { it.isNotEmpty() }.toSet()
     }
@@ -53,7 +66,7 @@ class EhTitleNormalizer(private val toSimplified: (String) -> String = { it }) {
             simplified.forEach { char ->
                 when {
                     char in CENSOR_MARKS -> append(WILDCARD)
-                    char.isLetterOrDigit() -> append(char)
+                    char.isLetterOrDigit() -> append(JAPANESE_FORMS[char] ?: char)
                 }
             }
         }
@@ -76,9 +89,28 @@ class EhTitleNormalizer(private val toSimplified: (String) -> String = { it }) {
         private val INNERMOST_GROUP = Regex("""[(\[{【〔][^()\[\]{}【】〔〕]*[)\]}】〕]""")
         private val INNERMOST_NON_ROUND_GROUP = Regex("""[\[{【〔][^\[\]{}【】〔〕]*[\]}】〕]""")
         private val LEADING_EVENT = Regex("""^\s*\([^)]*\)""")
-        private val LEADING_GROUP = Regex("""^\s*(?:\([^)]*\)\s*)?[\[【]([^\]】]+)[\]】]""")
+        private val LEADING_GROUP = Regex("""^\s*(?:\([^)]*\)|[\[【][^\]】]*[\]】])""")
+        private val TRANSLATOR = Regex(
+            "汉化|漢化|翻訳|翻译|翻譯|中文|中国|中國|chinese|english|個人|个人|机翻|機翻|嵌字|修正|dl版|digital",
+            RegexOption.IGNORE_CASE,
+        )
         private val INNER_PARENS = Regex("""\(([^)]*)\)""")
         private const val CENSOR_MARKS = "○◯〇●◎◉*×✕✖■□◆◇"
+
+        /**
+         * Japanese forms of Chinese characters and their simplified Chinese form, where the traditional to simplified
+         * conversion does not cover them (it maps 櫻 to 樱, not 桜).
+         */
+        private val JAPANESE_FORMS: Map<Char, Char> = (
+            "気气発发変变様样続续単单関关楽乐図图処处対对帰归戦战歳岁悪恶済济広广拡扩鉄铁転转伝传売卖読读説说" +
+                "隠隐縁缘涙泪剣剑薬药験验駅驿桜樱沢泽浜滨栄荣営营労劳覚觉権权歓欢観观黒黑弾弹姫姬恵惠険险検检" +
+                "鶏鸡圧压囲围遅迟亜亚悩恼脳脑猟猎獣兽繊纤絵绘経经総总緑绿縄绳継继粋粹穏稳稲稻県县斎斋斉齐歩步" +
+                "毎每渋涩満满瀬濑焼烧犠牺獄狱畳叠竜龙糸丝紅红絶绝聴听臓脏舗铺芸艺蔵藏蛍萤衆众覇霸訳译証证豊丰" +
+                "賛赞辺边郷乡酔醉醸酿録录闘斗陥陷隣邻雑杂霊灵頼赖顔颜顕显類类飲饮騒骚髪发麺面黙默齢龄拝拜抜拔" +
+                "択择拠据捜搜掲揭揺摇撃击摂摄擬拟晩晚暁晓桟栈歯齿殺杀渇渴渓溪滝泷漢汉為为煙烟円圆実实仏佛" +
+                "仮假価价偽伪児儿剤剂勧劝収收団团塁垒壊坏奨奖嬢娘寛宽巣巢帯带庁厅廃废従从徳德応应懐怀戯戏挿插" +
+                "挙举捨舍掃扫敵敌暦历査查殻壳浄净涼凉渉涉渦涡湯汤漁渔潔洁獲获現现疎疏痩瘦砲炮禍祸穂穗粧妆"
+            ).chunked(2).associate { it[0] to it[1] }
     }
 }
 
@@ -86,22 +118,25 @@ class EhTitleNormalizer(private val toSimplified: (String) -> String = { it }) {
 internal object EhTitleSimilarity {
     private val DIGITS = Regex("""\d+""")
 
-    /** Edit distance where [EhTitleNormalizer.WILDCARD] matches any character; null once above [limit]. */
+    /**
+     * Edit distance where [EhTitleNormalizer.WILDCARD] matches any character; null once above [limit]. Adding or
+     * removing a Chinese character costs [HAN_EDIT] and replacing one by another twice that: one of them carries a word
+     * (宮島桜の場合 and 宮島椿の場合 are two books of a series), while a kana, letter or punctuation mark differs
+     * between sites more easily and costs 1.
+     */
     fun distance(a: String, b: String, limit: Int): Int? {
         if (kotlin.math.abs(a.length - b.length) > limit) return null
-        var previous = IntArray(b.length + 1) { it }
+        var previous = IntArray(b.length + 1)
+        for (j in 1..b.length) previous[j] = previous[j - 1] + edit(b[j - 1])
         var current = IntArray(b.length + 1)
         for (i in 1..a.length) {
-            current[0] = i
+            current[0] = previous[0] + edit(a[i - 1])
             var rowMin = current[0]
             for (j in 1..b.length) {
-                val same = a[i - 1] == b[j - 1] ||
-                    a[i - 1] == EhTitleNormalizer.WILDCARD ||
-                    b[j - 1] == EhTitleNormalizer.WILDCARD
                 current[j] = minOf(
-                    previous[j - 1] + if (same) 0 else 1,
-                    previous[j] + 1,
-                    current[j - 1] + 1,
+                    previous[j - 1] + substitution(a[i - 1], b[j - 1]),
+                    previous[j] + edit(a[i - 1]),
+                    current[j - 1] + edit(b[j - 1]),
                 )
                 rowMin = minOf(rowMin, current[j])
             }
@@ -113,14 +148,30 @@ internal object EhTitleSimilarity {
         return previous[b.length].takeIf { it <= limit }
     }
 
+    private fun substitution(a: Char, b: Char): Int = when {
+        a == b || a == EhTitleNormalizer.WILDCARD || b == EhTitleNormalizer.WILDCARD -> 0
+        isHan(a) && isHan(b) -> 2 * HAN_EDIT
+        else -> 1
+    }
+
+    private fun edit(char: Char): Int = if (isHan(char)) HAN_EDIT else 1
+
+    private fun isHan(char: Char) = Character.UnicodeScript.of(char.code) == Character.UnicodeScript.HAN
+
+    private const val HAN_EDIT = 3
+
+    /** Titles shorter than this by different artists are different works, even when equal. */
+    private const val MIN_CONFLICT_LENGTH = 8
+
     /**
      * Edits allowed between two keys of the same work: about one in seven characters, one in four when the artists
-     * agree, none for short titles unless the artists agree, and none when both name different artists. Titles of one
-     * or two characters only match exactly with the same artist.
+     * agree, none for short titles unless the artists agree. When both name different artists only an equal title of
+     * at least [MIN_CONFLICT_LENGTH] characters matches (the artist is romanized differently). Titles of one or two
+     * characters only match exactly with the same artist.
      */
     fun allowedEdits(length: Int, artistsAgree: Boolean, artistsConflict: Boolean): Int? = when {
         length <= 2 -> if (artistsAgree) 0 else null
-        artistsConflict -> 0
+        artistsConflict -> if (length >= MIN_CONFLICT_LENGTH) 0 else null
         length <= 5 -> if (artistsAgree) 1 else 0
         artistsAgree -> length / 4
         else -> length / 7
@@ -134,6 +185,21 @@ internal object EhTitleSimilarity {
     }
 
     fun mostlyWildcards(key: String) = key.count { it == EhTitleNormalizer.WILDCARD } * 2 > key.length
+
+    /** Shortest title that may match a longer one it is part of, see [contains]. */
+    const val MIN_CONTAINED_LENGTH = 4
+
+    /** Whether [short] appears in [long], wildcards matching any character. */
+    fun contains(long: String, short: String): Boolean {
+        if (short.length > long.length) return false
+        return (0..long.length - short.length).any { start ->
+            short.indices.all { i ->
+                val a = long[start + i]
+                val b = short[i]
+                a == b || a == EhTitleNormalizer.WILDCARD || b == EhTitleNormalizer.WILDCARD
+            }
+        }
+    }
 
     fun minShared(bigrams: Int) = maxOf(1, ceil(bigrams * 0.3).toInt())
 }
@@ -206,11 +272,12 @@ class EhFavoritesIndex(
                 val galleryArtists = artists[key.gallery]
                 val known = mangaArtists.isNotEmpty() && galleryArtists.isNotEmpty()
                 val agree = known && mangaArtists.any { it in galleryArtists }
-                val length = maxOf(query.length, key.text.length)
-                val allowed = EhTitleSimilarity.allowedEdits(length, agree, artistsConflict = known && !agree)
-                    ?: return@candidate
                 if (!EhTitleSimilarity.sameNumbers(query, key.text)) return@candidate
-                val distance = EhTitleSimilarity.distance(query, key.text, allowed) ?: return@candidate
+                val length = maxOf(query.length, key.text.length)
+                val distance = EhTitleSimilarity.allowedEdits(length, agree, artistsConflict = known && !agree)
+                    ?.let { allowed -> EhTitleSimilarity.distance(query, key.text, allowed) }
+                    ?: containedScore(query, key.text, agree)
+                    ?: return@candidate
                 val previous = scores[key.gallery]
                 if (previous == null || distance < previous) scores[key.gallery] = distance
             }
@@ -218,6 +285,20 @@ class EhFavoritesIndex(
         if (scores.isEmpty()) return null
         val matched = scores.entries.sortedBy { it.value }.take(MAX_MATCHES).map { galleries[it.key] }
         return EhFavoriteMatch(matched, byGalleryId = false)
+    }
+
+    /**
+     * A title shortened on one site (only the main title, without its subtitle) matches when the artists agree; it
+     * ranks after the titles matched by edit distance.
+     */
+    private fun containedScore(query: String, key: String, artistsAgree: Boolean): Int? {
+        if (!artistsAgree || minOf(query.length, key.length) < EhTitleSimilarity.MIN_CONTAINED_LENGTH) return null
+        val contained = if (query.length <= key.length) {
+            EhTitleSimilarity.contains(key, query)
+        } else {
+            EhTitleSimilarity.contains(query, key)
+        }
+        return if (contained) CONTAINED_SCORE + kotlin.math.abs(query.length - key.length) else null
     }
 
     /** Keys sharing enough character pairs with [query], most shared first. */
@@ -255,6 +336,7 @@ class EhFavoritesIndex(
         private const val CACHE_SIZE = 2_000
         private const val MAX_CANDIDATES = 50
         private const val MAX_MATCHES = 5
+        private const val CONTAINED_SCORE = 1_000
 
         val EMPTY = EhFavoritesIndex(EhFavoritesIndexFile(), EhTitleNormalizer())
     }
