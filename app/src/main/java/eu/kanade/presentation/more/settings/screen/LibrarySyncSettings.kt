@@ -200,6 +200,13 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
             }
             addAll(autoSyncItems(preferences, autoSync))
             add(
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = preferences.showEhViewerFavorites,
+                    title = stringResource(MR.strings.library_sync_ehviewer_favorites),
+                    subtitle = stringResource(MR.strings.library_sync_ehviewer_favorites_summary),
+                ),
+            )
+            add(
                 Preference.PreferenceItem.EditTextPreference(
                     preference = preferences.deviceName,
                     title = stringResource(MR.strings.library_sync_device_name),

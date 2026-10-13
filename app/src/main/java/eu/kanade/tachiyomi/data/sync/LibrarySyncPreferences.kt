@@ -41,6 +41,19 @@ class LibrarySyncPreferences(
         defaultDeviceName(),
     )
 
+    // EhViewer favorites, see EhFavoritesStore
+
+    /** Marks manga favorited in the EhViewer fork; off also stops downloading its favorites. */
+    val showEhViewerFavorites = preferenceStore.getBoolean(
+        Preference.appStateKey("library_sync_ehviewer_favorites"),
+        true,
+    )
+
+    val ehViewerFavoritesETag = preferenceStore.getString(
+        Preference.appStateKey("library_sync_ehviewer_favorites_etag"),
+        "",
+    )
+
     // Automatic sync, see LibraryAutoSync
 
     val autoSync = preferenceStore.getBoolean(Preference.appStateKey("library_sync_auto_enabled"), true)

@@ -20,6 +20,7 @@
   - 自动同步（默认开启，可关闭）：打开应用时同步一次；按间隔定时同步（15 分钟到 24 小时可选，默认 6 小时）；书架、搜索记录、看过标记或设置改动后，60 秒内没有新改动就同步，最多等 5 分钟；可选“仅在 Wi-Fi 下自动同步”。这些选项只保存在本机，恢复别的设备的设置时不会被覆盖。
 - **全局搜索记录**：双栏显示，长关键词自动换行。
 - **“看过”标记**：漫画详情页的“标记看过”按钮，和书架互不影响（移出书架后仍保留）。浏览书源和全局搜索结果的封面上用眼睛角标显示。E-Hentai 系画廊按画廊 ID 匹配，E-Hentai 和 ExHentai 通用。
+- **EhViewer 收藏标记**：配合 [EhViewer 改版](https://github.com/tiger-git2022/ehviewer-onedrive)，两边登录同一个微软账号即可。同步时读取 EhViewer 上传的收藏清单（`ehviewer/export/favorites-index.json.gz`），在浏览书源、全局搜索的封面上显示“本地”或“云:收藏夹名”角标，详情页多一个按钮，点开能看到匹配到的 EhViewer 画廊，并可在 EhViewer 中打开。E-Hentai 系书源按画廊 ID 匹配；其他书源按标题匹配，会忽略各种括号和其中的作者、语言、汉化组等标签，统一全角半角和繁简（Android 10 及以上），“催○”这类和谐字当作任意字符，日文标题和罗马音标题都参与比较，卷数不同的不算同一本。可在书架同步设置里关闭。
 
 `main` 分支与上游保持一致，不在上面开发。
 
@@ -85,7 +86,7 @@ Azure 门户添加 Android 平台时填“包名”和“签名哈希”（未�
 
 - 独立文件：`eu/kanade/tachiyomi/data/sync/*`、`LibrarySyncSettings.kt`、`LibrarySyncActionState.kt`、
   `GlobalSearchHistoryPreferences.kt`、`GlobalSearchHistoryContent.kt`、`SearchHistory.kt`、`ForkVersion.kt`、
-  `MangaMarkBadges.kt`、`ReadMarkActionButton.kt`、
+  `MangaMarkBadges.kt`、`ReadMarkActionButton.kt`、`EhFavoriteBadges.kt`、`EhFavoriteActionButton.kt`、
   `i18n/.../strings_tiger.xml`、`app/src/release/res/values/strings_tiger.xml`、`app/proguard-tiger.pro`、
   `.github/workflows/tiger-*.yml`
 - 改动的上游文件（每处只有几行）：`app/build.gradle.kts`（文件末尾的 `region Fork` 块和 msal 依赖）、
@@ -123,6 +124,7 @@ Personal fork of [mihonapp/mihon](https://github.com/mihonapp/mihon). The `custo
   - automatic sync (on by default): once at app start, periodically (15 min to 24 h, default 6 h), and 60 s after the last change to the library, search history, marks or settings (at most 5 min after the first); optionally only on Wi-Fi. These options stay on the device and are not changed by restoring another device's settings.
 - **Global search history** in two columns; long queries wrap.
 - **"Read before" mark**: a button on the manga details page, independent of the library (kept after removing from the library). Shown as an eye badge on covers in Browse and global search. E-Hentai galleries match by gallery ID, so E-Hentai and ExHentai share marks.
+- **EhViewer favorite marks**: with the [EhViewer fork](https://github.com/tiger-git2022/ehviewer-onedrive) signed in to the same Microsoft account, a sync reads the favorites list EhViewer uploads (`ehviewer/export/favorites-index.json.gz`). Covers in Browse and global search get a "Local" or "Cloud: slot name" badge, and the details page gets a button listing the matching EhViewer galleries, which open in EhViewer. E-Hentai sources match by gallery ID; other sources match by title, ignoring brackets and the artist, language and translator tags in them, full-width/half-width and traditional/simplified Chinese (Android 10+), with censor marks like "催○" matching any character; Japanese and romanized titles both count, different volume numbers do not match. Can be turned off in the library sync settings.
 
 `main` mirrors upstream and is not developed on.
 

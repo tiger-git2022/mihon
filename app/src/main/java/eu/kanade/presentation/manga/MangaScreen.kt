@@ -48,6 +48,7 @@ import androidx.compose.ui.util.fastMap
 import eu.kanade.presentation.components.relativeDateText
 import eu.kanade.presentation.manga.components.ChapterDownloadAction
 import eu.kanade.presentation.manga.components.ChapterHeader
+import eu.kanade.presentation.manga.components.EhFavoriteActionButton
 import eu.kanade.presentation.manga.components.ExpandableMangaDescription
 import eu.kanade.presentation.manga.components.MangaActionRow
 import eu.kanade.presentation.manga.components.MangaBottomActionMenu
@@ -396,7 +397,10 @@ private fun MangaScreenSmallImpl(
                             onTrackingClicked = onTrackingClicked,
                             onEditIntervalClicked = onEditIntervalClicked,
                             onEditCategory = onEditCategoryClicked,
-                            extraActions = { ReadMarkActionButton(state.manga) },
+                            extraActions = {
+                                ReadMarkActionButton(state.manga)
+                                EhFavoriteActionButton(state.manga)
+                            },
                         )
                     }
 
@@ -615,7 +619,10 @@ fun MangaScreenLargeImpl(
                             onTrackingClicked = onTrackingClicked,
                             onEditIntervalClicked = onEditIntervalClicked,
                             onEditCategory = onEditCategoryClicked,
-                            extraActions = { ReadMarkActionButton(state.manga) },
+                            extraActions = {
+                                ReadMarkActionButton(state.manga)
+                                EhFavoriteActionButton(state.manga)
+                            },
                         )
                         ExpandableMangaDescription(
                             defaultExpandState = true,

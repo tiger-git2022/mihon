@@ -47,4 +47,17 @@
     <string name="library_sync_on_change_summary">书架、搜索记录、看过标记或设置改动后，60 秒内没有新改动就同步；从第一次改动算起最多等 5 分钟。</string>
     <string name="library_sync_wifi_only">仅在 Wi-Fi 下自动同步</string>
     <string name="library_sync_wifi_only_summary">自动同步会等到连上不计流量的网络。“立即同步”不受限制。</string>
+
+    <!-- EhViewer 收藏 -->
+    <string name="library_sync_step_ehviewer_favorites">EhViewer 收藏</string>
+    <string name="library_sync_ehviewer_favorites">标记 EhViewer 里收藏过的漫画</string>
+    <string name="library_sync_ehviewer_favorites_summary">同步时读取 EhViewer 改版上传到同一个 OneDrive 账号的收藏清单，在浏览、全局搜索的封面和详情页标出“本地”或“云:收藏夹名”。E-Hentai 源按画廊 ID 匹配，其他源按标题匹配（忽略括号、标签、繁简差异和“催○”这类和谐字）。</string>
+    <string name="ehviewer_favorite_local">本地</string>
+    <string name="ehviewer_favorite_cloud">云:%s</string>
+    <string name="ehviewer_favorite_title">EhViewer 收藏</string>
+    <string name="ehviewer_favorite_by_gallery_id">按画廊 ID 匹配。</string>
+    <string name="ehviewer_favorite_by_title">按标题匹配，请确认是不是同一部作品。</string>
+    <string name="ehviewer_favorite_local_full">本地收藏</string>
+    <string name="ehviewer_favorite_cloud_full">云端收藏：%s</string>
+    <string name="ehviewer_favorite_open">在 EhViewer 中打开</string>
 </resources>

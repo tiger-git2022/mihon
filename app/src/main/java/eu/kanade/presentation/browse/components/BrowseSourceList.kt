@@ -67,6 +67,7 @@ private fun BrowseSourceListItem(
         badge = {
             InLibraryBadge(enabled = manga.favorite)
             MangaMarkBadges(manga.source, manga.url)
+            EhFavoriteBadges(manga)
         },
         onLongClick = onLongClick,
         onClick = onClick,

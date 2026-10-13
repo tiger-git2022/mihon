@@ -173,6 +173,26 @@ class OneDriveSyncClient(
         }
     }
 
+    /** ETag of [path] in the app folder, null if there is no such file. */
+    suspend fun eTag(path: String): String? {
+        val accessToken = acquireAccessToken()
+        val request = Request.Builder()
+            .url("${itemUrl(path)}?\$select=eTag")
+            .header("Authorization", "Bearer $accessToken")
+            .get()
+            .build()
+
+        return httpClient.newCall(request).await().use { response ->
+            when {
+                response.code == 404 -> null
+                !response.isSuccessful -> throw response.toGraphException("read", path)
+                else -> runCatching { JSONObject(response.body.string()).optString("eTag") }
+                    .getOrNull()
+                    ?.takeIf(String::isNotBlank)
+            }
+        }
+    }
+
     /** Uploads [bytes] to [fileName], replacing any existing file. */
     suspend fun writeBytes(fileName: String, bytes: ByteArray) {
         val accessToken = acquireAccessToken()
@@ -310,7 +330,13 @@ class OneDriveSyncClient(
     )
 
     private fun fileUrl(fileName: String): String {
-        return "$APP_FOLDER_URL:/${URLEncoder.encode(fileName, "UTF-8").replace("+", "%20")}:/content"
+        return "${itemUrl(fileName)}:/content"
+    }
+
+    /** [path] may name a file in a subfolder, like the EhViewer files under `ehviewer/`. */
+    private fun itemUrl(path: String): String {
+        val encoded = path.split('/').joinToString("/") { URLEncoder.encode(it, "UTF-8").replace("+", "%20") }
+        return "$APP_FOLDER_URL:/$encoded"
     }
 
     private fun Response.toGraphException(operation: String, fileName: String): OneDriveSyncException {

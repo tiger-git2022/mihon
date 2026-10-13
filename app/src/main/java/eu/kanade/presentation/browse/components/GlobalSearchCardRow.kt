@@ -45,6 +45,7 @@ fun GlobalSearchCardRow(
                 title = title.title,
                 cover = title.asMangaCover(),
                 mangaUrl = title.url,
+                authors = listOfNotNull(title.author, title.artist),
                 isFavorite = title.favorite,
                 onClick = { onClick(title) },
                 onLongClick = { onLongClick(title) },
@@ -58,6 +59,7 @@ private fun MangaItem(
     title: String,
     cover: MangaCover,
     mangaUrl: String,
+    authors: List<String>,
     isFavorite: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
@@ -70,6 +72,7 @@ private fun MangaItem(
             coverBadgeStart = {
                 InLibraryBadge(enabled = isFavorite)
                 MangaMarkBadges(cover.sourceId, mangaUrl)
+                EhFavoriteBadges(mangaUrl, title, authors)
             },
             coverAlpha = if (isFavorite) CommonMangaItemDefaults.BrowseFavoriteCoverAlpha else 1f,
             onClick = onClick,
