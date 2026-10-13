@@ -18,16 +18,17 @@ import tachiyomi.domain.source.service.SourceManager
 class GlobalSearchViewModel(
     @Assisted initialQuery: String,
     @Assisted initialExtensionFilter: String?,
-    private val sourcePreferences: SourcePreferences,
+    sourcePreferences: SourcePreferences,
     sourceManager: SourceManager,
     extensionManager: ExtensionManager,
     networkToLocalManga: NetworkToLocalManga,
     getManga: GetManga,
     preferences: SourcePreferences,
+    private val searchHistoryPreferences: GlobalSearchHistoryPreferences,
 ) : SearchViewModel(
     initialState = State(
         searchQuery = initialQuery,
-        searchHistory = sourcePreferences.globalSearchHistory.get(),
+        searchHistory = searchHistoryPreferences.globalSearchHistory.get(),
         sourceFilter = if (sourcePreferences.pinnedSources.get().isEmpty()) {
             SourceFilter.All
         } else {
@@ -60,7 +61,7 @@ class GlobalSearchViewModel(
         }
     }
 
-    override fun getEnabledSources(): List<Source> {
+    override suspend fun getEnabledSources(): List<Source> {
         return super.getEnabledSources()
             .filter { state.value.sourceFilter != SourceFilter.PinnedOnly || "${it.id}" in pinnedSources }
     }
@@ -70,7 +71,7 @@ class GlobalSearchViewModel(
         if (query.isEmpty()) return
 
         updateSearchQuery(query)
-        updateSearchHistory(sourcePreferences.globalSearchHistory.get().withSearchQuery(query))
+        updateSearchHistory(searchHistoryPreferences.globalSearchHistory.get().withSearchQuery(query))
         super.search()
     }
 
@@ -83,7 +84,7 @@ class GlobalSearchViewModel(
     }
 
     private fun updateSearchHistory(history: List<String>) {
-        sourcePreferences.globalSearchHistory.set(history)
+        searchHistoryPreferences.globalSearchHistory.set(history)
         updateState { it.copy(searchHistory = history) }
     }
 }

@@ -1,0 +1,69 @@
+# Fork (tiger-git2022/mihon): build and test pull requests into `custom`.
+name: Tiger CI
+
+on:
+  pull_request:
+    branches:
+      - custom
+    paths-ignore:
+      - '**.md'
+      - 'fastlane/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & test
+    runs-on: ubuntu-26.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          java-version-file: .github/.java-version
+          distribution: temurin
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      - name: Run unit tests
+        id: unit_tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: Build release APK (debug-signed)
+        run: ./gradlew assembleRelease -Ptiger.buildNumber=1 -Pinclude-telemetry=false -Penable-updater=true
+
+      - name: Check code format
+        run: ./gradlew spotlessCheck
+
+      # The local-only build output redirect (end of settings.gradle.kts) is off on CI;
+      # make sure it still configures.
+      - name: Check local build dir redirect
+        run: ./gradlew help -Ptiger.localBuildDir=true
+
+      - name: Upload test reports
+        if: failure() && steps.unit_tests.outcome == 'failure'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-reports-${{ github.sha }}
+          path: '**/build/reports/tests/'
+
+      - name: Upload APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: apk-${{ github.sha }}
+          path: |
+            app/build/outputs/apk/release/app-arm64-v8a-release.apk
+            app/build/outputs/apk/release/app-universal-release.apk
+          retention-days: 7

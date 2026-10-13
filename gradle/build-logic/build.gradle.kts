@@ -5,11 +5,14 @@ plugins {
     `java-gradle-plugin`
 }
 
-// This is an included build, so it needs its own output redirect.
-layout.buildDirectory.set(
-    file(System.getProperty("user.home"))
-        .resolve(".gradle/project-builds/mihon/build-logic"),
-)
+// Fork (tiger-git2022/mihon): local-only build output redirect, see the end of /settings.gradle.kts.
+// This is an included build, so it needs its own redirect.
+if (providers.gradleProperty("tiger.localBuildDir").orNull?.toBoolean() ?: (System.getenv("CI") == null)) {
+    layout.buildDirectory.set(
+        file(System.getProperty("user.home"))
+            .resolve(".gradle/project-builds/mihon/build-logic"),
+    )
+}
 
 // Configuration should be synced with [/gradle/build-logic/src/main/kotlin/PluginSpotless.kt]
 val ktlintVersion = libs.ktlint.bom.get().version
@@ -33,6 +36,7 @@ spotless {
 dependencies {
     compileOnly(gradleKotlinDsl())
     compileOnly(libs.android.gradle)
+    compileOnly(libs.android.gradle.runtimeDependency("sdk-common"))
     compileOnly(libs.kotlin.compose.compiler.gradle)
     compileOnly(libs.kotlin.gradle)
     implementation(libs.spotless.gradle)
@@ -78,4 +82,14 @@ gradlePlugin {
             implementationClass = "PluginSpotless"
         }
     }
+}
+
+fun Provider<MinimalExternalModuleDependency>.runtimeDependency(name: String): Provider<String> = map { dependency ->
+    configurations.detachedConfiguration(dependencies.create(dependency))
+        .attributes { attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME)) }
+        .incoming.resolutionResult.allComponents
+        .firstOrNull { it.moduleVersion?.name == name }
+        ?.moduleVersion
+        ?.toString()
+        ?: error("${dependency.module} has no runtime dependency named $name")
 }

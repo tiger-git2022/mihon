@@ -37,20 +37,9 @@ class GetApplicationRelease(
             // tagged as something like "r1234"
             newVersion.toInt() > commitCount
         } else {
-            // Release builds: based on releases in "mihonapp/mihon" repo
-            // tagged as something like "v0.1.2"
-            val oldVersion = versionName.replace("[^\\d.]".toRegex(), "")
-
-            val newSemVer = newVersion.split(".").map { it.toInt() }
-            val oldSemVer = oldVersion.split(".").map { it.toInt() }
-
-            oldSemVer.mapIndexed { index, i ->
-                if (newSemVer[index] > i) {
-                    return true
-                }
-            }
-
-            false
+            // Fork: release builds are based on releases in "tiger-git2022/mihon"
+            // tagged as something like "v0.21.2-t5", see [ForkVersion]
+            ForkVersion.isNewer(versionName, versionTag)
         }
     }
 

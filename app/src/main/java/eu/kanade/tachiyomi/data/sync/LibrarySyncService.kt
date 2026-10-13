@@ -12,6 +12,7 @@ import tachiyomi.domain.manga.model.MangaUpdate
 import tachiyomi.domain.manga.repository.MangaRepository
 import java.io.IOException
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 @Inject
 @SingleIn(AppScope::class)
@@ -21,6 +22,9 @@ class LibrarySyncService(
     private val mangaRepository: MangaRepository,
     private val oneDriveSyncClient: OneDriveSyncClient,
 ) {
+    val redirectUri: String
+        get() = oneDriveSyncClient.redirectUri
+
     suspend fun refreshAccount() {
         updateAccount(oneDriveSyncClient.currentAccount())
     }
@@ -153,17 +157,13 @@ class LibrarySyncService(
                 }
                 entry.favorite && existing != null && !existing.favorite -> {
                     val success = mangaRepository.update(
-                        MangaUpdate(
-                            id = existing.id,
-                            favorite = true,
-                            dateAdded = now,
-                        ),
+                        MangaUpdate(existing.id) { favoriteAt = Instant.fromEpochMilliseconds(now) },
                     )
                     if (!success) throw LibrarySyncException("Could not add ${entry.manga.title} to the library")
                     added++
                 }
                 !entry.favorite && existing?.favorite == true -> {
-                    val success = mangaRepository.update(MangaUpdate(id = existing.id, favorite = false))
+                    val success = mangaRepository.update(MangaUpdate(existing.id) { favoriteAt = null })
                     if (!success) throw LibrarySyncException("Could not remove ${entry.manga.title} from the library")
                     removed++
                 }
@@ -180,9 +180,12 @@ class LibrarySyncService(
         manga = LibrarySyncManga.from(this),
     )
 
+    /**
+     * When the entry was added to the library, if known. Removal times are not recorded by the
+     * app, so a removal is treated as having happened at sync time.
+     */
     private fun Manga.membershipModifiedAt(now: Long): Long {
-        val triggerTimestamp = favoriteModifiedAt?.times(1_000)
-        return triggerTimestamp ?: dateAdded.takeIf { it > 0 } ?: now
+        return favoriteAt?.toEpochMilliseconds()?.takeIf { it > 0 } ?: now
     }
 
     private data class LocalState(

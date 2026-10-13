@@ -1,7 +1,7 @@
 {
   "client_id": "77f7046c-0a22-44b8-aa16-8b8416628c6c",
   "authorization_user_agent": "DEFAULT",
-  "redirect_uri": "msauth://app.mihon.dev/HrLgSH3tTFq1KFxzXlgszundt4s%3D",
+  "redirect_uri": "msauth://<application id>/<signature hash> (filled in at runtime by OneDriveSyncClient)",
   "account_mode": "SINGLE",
   "broker_redirect_uri_registered": false,
   "authorities": [
