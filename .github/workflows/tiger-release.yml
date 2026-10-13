@@ -46,10 +46,6 @@ jobs:
       group: tiger-release
       cancel-in-progress: false
 
-    env:
-      # Enables the env based signing config in app/build.gradle.kts
-      MIHON_GITHUB_RELEASE: true
-
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -135,6 +131,9 @@ jobs:
       - name: Build signed release APKs
         if: steps.version.outputs.skip != 'true'
         env:
+          # Enables the env based signing config in app/build.gradle.kts. Only set for this
+          # step: that config reads the keystore env vars below, which other steps don't have.
+          MIHON_GITHUB_RELEASE: true
           storeFile: ${{ runner.temp }}/release.keystore
           storePassword: ${{ secrets.KEYSTORE_PASSWORD }}
           keyAlias: ${{ secrets.KEY_ALIAS }}
