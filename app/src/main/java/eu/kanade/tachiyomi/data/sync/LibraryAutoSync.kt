@@ -14,6 +14,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -102,8 +103,7 @@ class LibraryAutoSync(
     private val isChangeSyncAllowed: Boolean
         get() = isAllowed && preferences.syncOnChange.get()
 
-    /** Called by [LibrarySyncWorker]; true when a catch-up sync was requested since the last call. */
-    fun takeCatchUpRequest(): Boolean = catchUpRequested.getAndSet(false)
+    private fun takeCatchUpRequest(): Boolean = catchUpRequested.getAndSet(false)
 
     /** Called once from the Application. */
     fun init() {
@@ -129,7 +129,7 @@ class LibraryAutoSync(
             !launchSyncDone.also { launchSyncDone = true }
         }
         if (launchSync && isAllowed) {
-            scope.launch { syncNowOrLater() }
+            scope.launch { syncNowOrLater(fromChange = false) }
         }
     }
 
@@ -144,7 +144,7 @@ class LibraryAutoSync(
             pendingAfterSync = false
             pending
         }
-        if (pending && isChangeSyncAllowed) enqueueCatchUpWork()
+        if (pending && isChangeSyncAllowed) enqueueCatchUpWork(fromChange = true)
     }
 
     /** Called by the screens where the user changes synced data. */
@@ -156,7 +156,7 @@ class LibraryAutoSync(
                 return
             }
             if (!inForeground) {
-                enqueueCatchUpWork()
+                enqueueCatchUpWork(fromChange = true)
                 return
             }
             val now = SystemClock.elapsedRealtime()
@@ -172,18 +172,20 @@ class LibraryAutoSync(
                 // The options may have been turned off during the countdown
                 if (!isChangeSyncAllowed) return@launch
                 // Not a child of the countdown, so a later change cannot cancel the running sync
-                scope.launch { syncNowOrLater() }
+                scope.launch { syncNowOrLater(fromChange = true) }
             }
         }
     }
 
-    private suspend fun syncNowOrLater() {
+    private suspend fun syncNowOrLater(fromChange: Boolean) {
         if (!isNetworkAllowed()) {
-            enqueueCatchUpWork()
+            enqueueCatchUpWork(fromChange)
             return
         }
         try {
-            service.sync()
+            val result = service.sync()
+            // A failed search history, marks or settings step: WorkManager retries with backoff
+            if (result.warning != null) enqueueCatchUpWork(fromChange)
         } catch (e: CancellationException) {
             throw e
         } catch (e: OneDriveSyncAuthException) {
@@ -191,7 +193,37 @@ class LibraryAutoSync(
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e)
             // WorkManager retries with backoff
-            enqueueCatchUpWork()
+            enqueueCatchUpWork(fromChange)
+        }
+    }
+
+    /**
+     * The sync of [LibrarySyncWorker]. The options are checked again here, since they may have changed after the
+     * work was queued.
+     */
+    internal suspend fun runWork(catchUpFromChange: Boolean, runAttemptCount: Int): WorkOutcome {
+        if (!isAllowed || (catchUpFromChange && !preferences.syncOnChange.get())) return WorkOutcome.SUCCESS
+        // Queued with a network constraint from before "only on Wi-Fi" was turned on
+        if (!isNetworkAllowed()) return WorkOutcome.RETRY
+        val retryOrFail = if (runAttemptCount < MAX_WORK_RETRIES) WorkOutcome.RETRY else WorkOutcome.FAILURE
+        takeCatchUpRequest()
+        return try {
+            do {
+                // Background syncs show nothing
+                val result = service.sync()
+                if (result.warning != null) return retryOrFail
+                // Changes requested a catch-up sync while this one ran; WorkManager dropped that request (KEEP)
+            } while (takeCatchUpRequest())
+            WorkOutcome.SUCCESS
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: OneDriveSyncAuthException) {
+            // Signing in again needs the user, retrying cannot help
+            logcat(LogPriority.WARN, e)
+            WorkOutcome.FAILURE
+        } catch (e: Exception) {
+            logcat(LogPriority.ERROR, e)
+            retryOrFail
         }
     }
 
@@ -280,19 +312,26 @@ class LibraryAutoSync(
         }
     }
 
-    /** Syncs once the network allows it, also after the app went to the background. */
-    private fun enqueueCatchUpWork() {
+    /**
+     * Syncs once the network allows it, also after the app went to the background. [fromChange] tells a sync of
+     * changes, which is skipped if "sync after changes" is turned off meanwhile, from a retry of a failed sync.
+     */
+    private fun enqueueCatchUpWork(fromChange: Boolean) {
         catchUpRequested.set(true)
         val request = OneTimeWorkRequestBuilder<LibrarySyncWorker>()
             .setConstraints(constraints())
+            .setInputData(workDataOf(LibrarySyncWorker.KEY_FROM_CHANGE to fromChange))
             .addTag(CATCH_UP_WORK_NAME)
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork(CATCH_UP_WORK_NAME, ExistingWorkPolicy.KEEP, request)
     }
 
+    internal enum class WorkOutcome { SUCCESS, RETRY, FAILURE }
+
     private companion object {
         const val PERIODIC_WORK_NAME = "LibrarySyncPeriodic"
         const val CATCH_UP_WORK_NAME = "LibrarySyncCatchUp"
+        const val MAX_WORK_RETRIES = 3
     }
 }
 
@@ -300,31 +339,19 @@ class LibraryAutoSync(
 class LibrarySyncWorker(context: Context, workerParams: WorkerParameters) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
-        val graph = applicationContext.appGraph
-        if (!graph.libraryAutoSync.isAllowed) return Result.success()
-        return try {
-            graph.libraryAutoSync.takeCatchUpRequest()
-            var syncs = 0
-            do {
-                // Background syncs show nothing; a failed secondary step is in the result's warning only
-                graph.librarySyncService.sync()
-                // Changes requested a catch-up sync while this one ran
-            } while (++syncs < MAX_SYNCS_PER_RUN && graph.libraryAutoSync.takeCatchUpRequest())
-            Result.success()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: OneDriveSyncAuthException) {
-            // Signing in again needs the user, retrying cannot help
-            logcat(LogPriority.WARN, e)
-            Result.failure()
-        } catch (e: Exception) {
-            logcat(LogPriority.ERROR, e)
-            Result.retry()
+        val outcome = applicationContext.appGraph.libraryAutoSync.runWork(
+            catchUpFromChange = inputData.getBoolean(KEY_FROM_CHANGE, false),
+            runAttemptCount = runAttemptCount,
+        )
+        return when (outcome) {
+            LibraryAutoSync.WorkOutcome.SUCCESS -> Result.success()
+            LibraryAutoSync.WorkOutcome.RETRY -> Result.retry()
+            LibraryAutoSync.WorkOutcome.FAILURE -> Result.failure()
         }
     }
 
-    private companion object {
-        const val MAX_SYNCS_PER_RUN = 3
+    companion object {
+        const val KEY_FROM_CHANGE = "from_change"
     }
 }
 
