@@ -1,9 +1,14 @@
 package eu.kanade.tachiyomi.data.sync
 
+import android.app.ActivityManager
+import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.NetworkCapabilities
+import android.os.Build
+import android.os.Process
 import android.os.SystemClock
+import androidx.core.content.getSystemService
 import androidx.preference.PreferenceManager
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -42,7 +47,6 @@ import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.manga.repository.MangaRepository
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Automatic OneDrive sync (fork-only feature), with the same rules as the EhViewer fork
@@ -87,10 +91,18 @@ class LibraryAutoSync(
     private var libraryChangedDuringSync = false
 
     /**
-     * A catch-up sync was requested. WorkManager drops a request while the catch-up work runs (policy KEEP), so the
-     * running worker checks this flag and syncs again.
+     * Only the main process syncs. The crash screen runs in its own process, where WorkManager is not initialized.
      */
-    private val catchUpRequested = AtomicBoolean(false)
+    private val isMainProcess: Boolean by lazy {
+        val processName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            Application.getProcessName()
+        } else {
+            context.getSystemService<ActivityManager>()?.runningAppProcesses
+                ?.firstOrNull { it.pid == Process.myPid() }
+                ?.processName
+        }
+        processName == null || processName == context.packageName
+    }
 
     // SharedPreferences keeps listeners weakly, so this one is held here
     private val settingsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -103,10 +115,13 @@ class LibraryAutoSync(
     private val isChangeSyncAllowed: Boolean
         get() = isAllowed && preferences.syncOnChange.get()
 
-    private fun takeCatchUpRequest(): Boolean = catchUpRequested.getAndSet(false)
+    private fun takeCatchUpRequest(): Boolean = synchronized(lock) {
+        preferences.catchUpPending.get().also { if (it) preferences.catchUpPending.set(false) }
+    }
 
     /** Called once from the Application. */
     fun init() {
+        if (!isMainProcess) return
         merge(
             preferences.accountId.changes(),
             preferences.autoSync.changes(),
@@ -124,6 +139,7 @@ class LibraryAutoSync(
     }
 
     fun onAppForeground() {
+        if (!isMainProcess) return
         inForeground = true
         val launchSync = synchronized(lock) {
             !launchSyncDone.also { launchSyncDone = true }
@@ -135,6 +151,7 @@ class LibraryAutoSync(
 
     /** The app went to the background: WorkManager syncs the changes the countdown has not synced yet. */
     fun onAppBackground() {
+        if (!isMainProcess) return
         inForeground = false
         val pending = synchronized(lock) {
             val pending = debounceJob != null || pendingAfterSync
@@ -205,16 +222,13 @@ class LibraryAutoSync(
         if (!isAllowed || (catchUpFromChange && !preferences.syncOnChange.get())) return WorkOutcome.SUCCESS
         // Queued with a network constraint from before "only on Wi-Fi" was turned on
         if (!isNetworkAllowed()) return WorkOutcome.RETRY
-        val retryOrFail = if (runAttemptCount < MAX_WORK_RETRIES) WorkOutcome.RETRY else WorkOutcome.FAILURE
-        takeCatchUpRequest()
-        return try {
-            do {
-                // Background syncs show nothing
-                val result = service.sync()
-                if (result.warning != null) return retryOrFail
-                // Changes requested a catch-up sync while this one ran; WorkManager dropped that request (KEEP)
-            } while (takeCatchUpRequest())
-            WorkOutcome.SUCCESS
+        val pending = takeCatchUpRequest()
+        // Catch-up work is appended behind running work; an earlier one in the chain already synced these changes
+        if (catchUpFromChange && !pending) return WorkOutcome.SUCCESS
+        val outcome = try {
+            // Background syncs show nothing
+            val result = service.sync()
+            if (result.warning == null) WorkOutcome.SUCCESS else retryOrFail(runAttemptCount)
         } catch (e: CancellationException) {
             throw e
         } catch (e: OneDriveSyncAuthException) {
@@ -223,8 +237,15 @@ class LibraryAutoSync(
             WorkOutcome.FAILURE
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e)
-            retryOrFail
+            retryOrFail(runAttemptCount)
         }
+        // The retry still has these changes to sync
+        if (outcome == WorkOutcome.RETRY && pending) preferences.catchUpPending.set(true)
+        return outcome
+    }
+
+    private fun retryOrFail(runAttemptCount: Int): WorkOutcome {
+        return if (runAttemptCount < MAX_WORK_RETRIES) WorkOutcome.RETRY else WorkOutcome.FAILURE
     }
 
     private suspend fun onSyncFinished() {
@@ -317,13 +338,15 @@ class LibraryAutoSync(
      * changes, which is skipped if "sync after changes" is turned off meanwhile, from a retry of a failed sync.
      */
     private fun enqueueCatchUpWork(fromChange: Boolean) {
-        catchUpRequested.set(true)
+        preferences.catchUpPending.set(true)
         val request = OneTimeWorkRequestBuilder<LibrarySyncWorker>()
             .setConstraints(constraints())
             .setInputData(workDataOf(LibrarySyncWorker.KEY_FROM_CHANGE to fromChange))
             .addTag(CATCH_UP_WORK_NAME)
             .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(CATCH_UP_WORK_NAME, ExistingWorkPolicy.KEEP, request)
+        // Appended behind a running catch-up, which may have read the pending flag already
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(CATCH_UP_WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
     }
 
     internal enum class WorkOutcome { SUCCESS, RETRY, FAILURE }
