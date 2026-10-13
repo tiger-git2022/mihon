@@ -73,6 +73,7 @@ private fun BrowseSourceComfortableGridItem(
         coverAlpha = if (manga.favorite) CommonMangaItemDefaults.BrowseFavoriteCoverAlpha else 1f,
         coverBadgeStart = {
             InLibraryBadge(enabled = manga.favorite)
+            MangaMarkBadges(manga.source, manga.url)
         },
         onLongClick = onLongClick,
         onClick = onClick,

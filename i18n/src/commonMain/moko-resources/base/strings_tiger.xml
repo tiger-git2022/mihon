@@ -20,6 +20,20 @@
     <string name="library_sync_sign_out_failed">OneDrive sign-out failed: %s</string>
     <string name="library_sync_success">Sync complete: %1$d added, %2$d removed, %3$d in library</string>
     <string name="library_sync_failed">Library sync failed: %s</string>
-    <string name="library_sync_info">Stores library additions and removals in the app\'s private OneDrive folder. Sign in with the same Microsoft account on each device and sync one device at a time. Categories, reading progress, downloads, and search history are not synchronized.</string>
+    <string name="library_sync_info">Syncs library additions and removals, global search history, \"read before\" marks and a settings backup per device through the app\'s private OneDrive folder. Sign in with the same Microsoft account on each device and sync one device at a time. Categories, reading progress and downloads are not synchronized.</string>
     <string name="library_sync_redirect_uri">Azure redirect URI of this build: %s</string>
+
+    <!-- Multi-device sync -->
+    <string name="sync_from_device">From %s</string>
+    <string name="library_sync_partial_failure">%1$s. Some data could not be synced: %2$s</string>
+    <string name="library_sync_device_name">Device name</string>
+    <string name="library_sync_restore_settings">Restore settings from OneDrive</string>
+    <string name="library_sync_restore_settings_summary">Each device uploads its settings when syncing</string>
+    <string name="library_sync_no_settings_backups">No settings backups on OneDrive yet. Sync on a device to upload its settings.</string>
+    <string name="library_sync_restore_settings_confirm">Replace this device\'s settings with the settings of %1$s from %2$s? Library, history and logins are not changed.</string>
+    <string name="library_sync_restore_started">Restoring settings…</string>
+
+    <!-- Read before mark -->
+    <string name="manga_mark_as_read">Mark read</string>
+    <string name="manga_mark_read">Read before</string>
 </resources>

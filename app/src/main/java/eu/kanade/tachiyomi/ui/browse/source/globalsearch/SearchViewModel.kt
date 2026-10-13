@@ -220,7 +220,7 @@ abstract class SearchViewModel(
         val searchQuery: String? = null,
         val sourceFilter: SourceFilter = SourceFilter.PinnedOnly,
         val onlyShowHasResults: Boolean = false,
-        val searchHistory: List<String> = emptyList(),
+        val searchHistory: List<SearchHistoryItem> = emptyList(),
         val items: Map<Source, SearchItemResult> = mapOf(),
         val dialog: Dialog? = null,
     ) {
