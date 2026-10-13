@@ -7,7 +7,9 @@ import dev.zacsweers.metro.SingleIn
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.GlobalSearchHistoryPreferences
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SearchHistoryState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -42,6 +44,20 @@ class LibrarySyncService(
     /** Progress of the running sync, null when no sync runs. */
     val progress: StateFlow<LibrarySyncProgress?> = _progress.asStateFlow()
 
+    private val _finished = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    /** Emits after every sync, successful or not. */
+    val finished: SharedFlow<Unit> = _finished
+
+    /** True while a sync runs; library writes seen meanwhile may come from the sync itself. */
+    val isSyncing: Boolean
+        get() = syncMutex.isLocked
+
+    /** Library entries right after the last library sync step in this process, null before it. */
+    @Volatile
+    var lastSyncedFavorites: Set<LibrarySyncKey>? = null
+        private set
+
     val redirectUri: String
         get() = oneDriveSyncClient.redirectUri
 
@@ -62,7 +78,14 @@ class LibrarySyncService(
      * Syncs the library, then the search history, the manga marks and this device's settings
      * backup. A failure after the library step is reported in [LibrarySyncResult.warning].
      */
-    suspend fun sync(): LibrarySyncResult = syncMutex.withLock {
+    suspend fun sync(): LibrarySyncResult = try {
+        syncLocked()
+    } finally {
+        // After the lock is released, so a listener can start the next sync right away
+        _finished.tryEmit(Unit)
+    }
+
+    private suspend fun syncLocked(): LibrarySyncResult = syncMutex.withLock {
         try {
             _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.LIBRARY)
             val account = oneDriveSyncClient.currentAccount()
@@ -70,10 +93,10 @@ class LibrarySyncService(
             updateAccount(account)
             val device = preferences.currentDevice()
 
-            val result = syncLibrary()
+            val result = retryOnConflict { syncLibrary() }
             val warnings = listOfNotNull(
-                runStep(LibrarySyncProgress.Step.SEARCH_HISTORY) { syncSearchHistory(device) },
-                runStep(LibrarySyncProgress.Step.MARKS) { syncMarks() },
+                runStep(LibrarySyncProgress.Step.SEARCH_HISTORY) { retryOnConflict { syncSearchHistory(device) } },
+                runStep(LibrarySyncProgress.Step.MARKS) { retryOnConflict { syncMarks() } },
                 runStep(LibrarySyncProgress.Step.SETTINGS_BACKUP) {
                     settingsBackupSync.upload(device) { stage ->
                         _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.SETTINGS_BACKUP, stage = stage)
@@ -84,6 +107,21 @@ class LibrarySyncService(
         } finally {
             _progress.value = null
         }
+    }
+
+    /**
+     * Each step reads the cloud file and writes it back with its ETag before changing anything locally,
+     * so a step that lost the race against another device can simply run again.
+     */
+    private suspend fun <T> retryOnConflict(step: suspend () -> T): T {
+        repeat(CONFLICT_RETRIES) {
+            try {
+                return step()
+            } catch (e: OneDriveSyncConflictException) {
+                logcat(LogPriority.WARN, e) { "Sync file changed on another device, retrying" }
+            }
+        }
+        return step()
     }
 
     suspend fun listSettingsBackups(): List<SettingsBackup> = settingsBackupSync.list()
@@ -166,6 +204,7 @@ class LibrarySyncService(
         )
         val result = applyMergedState(merged, localState.mangaByKey, now)
         preferences.baseline.set(json.encodeToString(merged))
+        lastSyncedFavorites = mangaRepository.getFavorites().mapTo(HashSet()) { LibrarySyncKey(it.source, it.url) }
         return result.copy(total = merged.entries.count(LibrarySyncEntry::favorite))
     }
 
@@ -340,5 +379,7 @@ data class LibrarySyncResult(
     /** Error of a step after the library sync, which itself succeeded. */
     val warning: String? = null,
 )
+
+private const val CONFLICT_RETRIES = 2
 
 class LibrarySyncException(message: String, cause: Throwable? = null) : IOException(message, cause)

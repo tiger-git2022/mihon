@@ -199,6 +199,9 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         // Updates widget update
         widgetManager.init(scope)
 
+        // Fork (tiger-git2022/mihon): automatic OneDrive sync
+        graph.libraryAutoSync.init()
+
         if (!LogcatLogger.isInstalled) {
             val minLogPriority = when {
                 networkPreferences.verboseLogging.get() -> LogPriority.VERBOSE
@@ -272,10 +275,12 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
 
     override fun onStart(owner: LifecycleOwner) {
         SecureActivityDelegate.onApplicationStart(this)
+        graph.libraryAutoSync.onAppForeground() // Fork (tiger-git2022/mihon)
     }
 
     override fun onStop(owner: LifecycleOwner) {
         SecureActivityDelegate.onApplicationStopped(this)
+        graph.libraryAutoSync.onAppBackground() // Fork (tiger-git2022/mihon)
     }
 
     override fun getPackageName(): String {

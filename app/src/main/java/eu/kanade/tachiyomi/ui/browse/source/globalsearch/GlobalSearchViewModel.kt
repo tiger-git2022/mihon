@@ -9,6 +9,7 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactoryKey
 import eu.kanade.domain.source.service.SourcePreferences
+import eu.kanade.tachiyomi.data.sync.LibraryAutoSync
 import eu.kanade.tachiyomi.data.sync.LibrarySyncPreferences
 import eu.kanade.tachiyomi.data.sync.SearchHistoryEntry
 import eu.kanade.tachiyomi.data.sync.SearchHistoryMerger
@@ -34,6 +35,7 @@ class GlobalSearchViewModel(
     preferences: SourcePreferences,
     private val searchHistoryPreferences: GlobalSearchHistoryPreferences,
     private val librarySyncPreferences: LibrarySyncPreferences,
+    private val libraryAutoSync: LibraryAutoSync,
 ) : SearchViewModel(
     initialState = State(
         searchQuery = initialQuery,
@@ -103,6 +105,7 @@ class GlobalSearchViewModel(
     fun clearSearchHistory() {
         val now = Clock.System.now().toEpochMilliseconds()
         searchHistoryPreferences.update { _, clearedAt -> SearchHistoryState(emptyList(), maxOf(clearedAt, now)) }
+        libraryAutoSync.notifyChanged()
     }
 
     private fun updateSearchHistory(
@@ -113,6 +116,7 @@ class GlobalSearchViewModel(
         searchHistoryPreferences.update { entries, clearedAt ->
             SearchHistoryState(SearchHistoryMerger.prune(transform(entries, device, now), now), clearedAt)
         }
+        libraryAutoSync.notifyChanged()
     }
     // endregion
 }

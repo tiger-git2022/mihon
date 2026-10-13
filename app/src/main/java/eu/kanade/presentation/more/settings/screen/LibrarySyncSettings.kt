@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import eu.kanade.presentation.more.settings.Preference
+import eu.kanade.tachiyomi.data.sync.LibrarySyncPreferences
 import eu.kanade.tachiyomi.data.sync.SettingsBackup
 import eu.kanade.tachiyomi.ui.library.librarySyncMessage
 import eu.kanade.tachiyomi.ui.library.librarySyncProgressText
@@ -57,6 +58,7 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
     val service = remember { context.appGraph.librarySyncService }
     val redirectUri = remember { runCatching { service.redirectUri }.getOrDefault("-") }
     val accountName by preferences.accountName.collectAsState()
+    val autoSync by preferences.autoSync.collectAsState()
     val activity = remember(context) { context.findActivity() }
     var isBusy by remember { mutableStateOf(false) }
     // Also shows a sync started from the library toolbar
@@ -196,6 +198,7 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
                     ),
                 )
             }
+            addAll(autoSyncItems(preferences, autoSync))
             add(
                 Preference.PreferenceItem.EditTextPreference(
                     preference = preferences.deviceName,
@@ -211,6 +214,49 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
                 )
             }
         },
+    )
+}
+
+/** Automatic sync options, see [eu.kanade.tachiyomi.data.sync.LibraryAutoSync]. */
+@Composable
+private fun autoSyncItems(
+    preferences: LibrarySyncPreferences,
+    autoSync: Boolean,
+): List<Preference.PreferenceItem<out Any, out Any>> {
+    val intervals = LibrarySyncPreferences.AUTO_SYNC_INTERVALS_MINUTES.associateWith { minutes ->
+        if (minutes < 60) {
+            stringResource(MR.strings.library_sync_auto_interval_minutes, minutes)
+        } else {
+            stringResource(MR.strings.library_sync_auto_interval_hours, minutes / 60)
+        }
+    }
+    return listOf(
+        Preference.PreferenceItem.SwitchPreference(
+            preference = preferences.autoSync,
+            title = stringResource(MR.strings.library_sync_auto),
+            subtitle = stringResource(MR.strings.library_sync_auto_summary),
+        ),
+        Preference.PreferenceItem.ListPreference(
+            preference = preferences.autoSyncIntervalMinutes,
+            entries = intervals,
+            title = stringResource(MR.strings.library_sync_auto_interval),
+            subtitleProvider = { value, entries ->
+                stringResource(MR.strings.library_sync_auto_interval_summary, entries[value].orEmpty())
+            },
+            visible = autoSync,
+        ),
+        Preference.PreferenceItem.SwitchPreference(
+            preference = preferences.syncOnChange,
+            title = stringResource(MR.strings.library_sync_on_change),
+            subtitle = stringResource(MR.strings.library_sync_on_change_summary),
+            visible = autoSync,
+        ),
+        Preference.PreferenceItem.SwitchPreference(
+            preference = preferences.autoSyncWifiOnly,
+            title = stringResource(MR.strings.library_sync_wifi_only),
+            subtitle = stringResource(MR.strings.library_sync_wifi_only_summary),
+            visible = autoSync,
+        ),
     )
 }
 
