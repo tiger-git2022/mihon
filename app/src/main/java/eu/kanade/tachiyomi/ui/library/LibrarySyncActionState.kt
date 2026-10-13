@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.ui.library
 
+import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -12,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import eu.kanade.tachiyomi.data.sync.LibrarySyncResult
 import eu.kanade.tachiyomi.ui.setting.SettingsScreen
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.Dispatchers
@@ -64,14 +66,7 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
                 runCatching {
                     withContext(Dispatchers.IO) { librarySyncService.sync() }
                 }.onSuccess { result ->
-                    context.toast(
-                        context.stringResource(
-                            MR.strings.library_sync_success,
-                            result.added,
-                            result.removed,
-                            result.total,
-                        ),
-                    )
+                    context.toast(context.librarySyncMessage(result))
                 }.onFailure { error ->
                     Log.e("LibrarySync", "Library sync failed", error)
                     context.toast(
@@ -85,4 +80,9 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
             }
         },
     )
+}
+
+internal fun Context.librarySyncMessage(result: LibrarySyncResult): String {
+    val message = stringResource(MR.strings.library_sync_success, result.added, result.removed, result.total)
+    return result.warning?.let { stringResource(MR.strings.library_sync_partial_failure, message, it) } ?: message
 }

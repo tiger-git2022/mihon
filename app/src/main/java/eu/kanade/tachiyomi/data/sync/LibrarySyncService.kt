@@ -4,9 +4,16 @@ import android.app.Activity
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import eu.kanade.tachiyomi.ui.browse.source.globalsearch.GlobalSearchHistoryPreferences
+import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SearchHistoryState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import logcat.LogPriority
+import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.manga.model.MangaUpdate
 import tachiyomi.domain.manga.repository.MangaRepository
@@ -21,7 +28,12 @@ class LibrarySyncService(
     private val preferences: LibrarySyncPreferences,
     private val mangaRepository: MangaRepository,
     private val oneDriveSyncClient: OneDriveSyncClient,
+    private val searchHistoryPreferences: GlobalSearchHistoryPreferences,
+    private val mangaMarkStore: MangaMarkStore,
+    private val settingsBackupSync: SettingsBackupSync,
 ) {
+    private val syncMutex = Mutex()
+
     val redirectUri: String
         get() = oneDriveSyncClient.redirectUri
 
@@ -38,11 +50,91 @@ class LibrarySyncService(
         updateAccount(null)
     }
 
-    suspend fun sync(): LibrarySyncResult {
+    /**
+     * Syncs the library, then the search history, the manga marks and this device's settings
+     * backup. A failure after the library step is reported in [LibrarySyncResult.warning].
+     */
+    suspend fun sync(): LibrarySyncResult = syncMutex.withLock {
         val account = oneDriveSyncClient.currentAccount()
             ?: throw LibrarySyncException("Sign in to OneDrive before syncing")
         updateAccount(account)
+        val device = preferences.currentDevice()
 
+        val result = syncLibrary()
+        val warnings = listOfNotNull(
+            runStep { syncSearchHistory(device) },
+            runStep { syncMarks() },
+            runStep { settingsBackupSync.upload(device) },
+        )
+        result.copy(warning = warnings.takeIf { it.isNotEmpty() }?.joinToString("; "))
+    }
+
+    suspend fun listSettingsBackups(): List<SettingsBackup> = settingsBackupSync.list()
+
+    suspend fun restoreSettings(backup: SettingsBackup) = settingsBackupSync.restore(backup)
+
+    suspend fun setRead(manga: Manga, read: Boolean) {
+        mangaMarkStore.setRead(manga.source, manga.url, manga.title, read, preferences.currentDevice())
+    }
+
+    private suspend fun syncSearchHistory(device: SyncDevice) {
+        val now = Clock.System.now().toEpochMilliseconds()
+        val remoteDocument = oneDriveSyncClient.readDocument(SearchHistorySyncFile.FILE_NAME)
+        val cloud = remoteDocument.contents?.takeIf(String::isNotBlank)
+            ?.let { json.decodeFromString<SearchHistorySyncFile>(it) }
+            ?: SearchHistorySyncFile()
+        if (cloud.version > SearchHistorySyncFile.CURRENT_VERSION) {
+            throw LibrarySyncException("The search history sync file was created by a newer app version")
+        }
+        val local = searchHistoryPreferences.entries.get().map { entry ->
+            // Entries from before search history was synced have no device yet
+            if (entry.deviceId.isBlank()) entry.copy(deviceId = device.id, deviceName = device.name) else entry
+        }
+        val clearedAt = maxOf(searchHistoryPreferences.clearedAt.get(), cloud.clearedAt)
+        val merged = SearchHistoryMerger.merge(local, cloud.entries, now, clearedAt)
+        oneDriveSyncClient.writeDocument(
+            fileName = SearchHistorySyncFile.FILE_NAME,
+            contents = json.encodeToString(SearchHistorySyncFile(entries = merged, clearedAt = clearedAt)),
+            etag = remoteDocument.etag,
+        )
+        // Keeps searches (or a clear) made while syncing; they go up with the next sync
+        searchHistoryPreferences.update { entries, localClearedAt ->
+            val newClearedAt = maxOf(localClearedAt, clearedAt)
+            SearchHistoryState(SearchHistoryMerger.merge(entries, merged, now, newClearedAt), newClearedAt)
+        }
+    }
+
+    private suspend fun syncMarks() {
+        val remoteDocument = oneDriveSyncClient.readDocument(MangaMarksFile.FILE_NAME)
+        val cloud = remoteDocument.contents?.takeIf(String::isNotBlank)
+            ?.let { json.decodeFromString<MangaMarksFile>(it) }
+            ?: MangaMarksFile()
+        if (cloud.version > MangaMarksFile.CURRENT_VERSION) {
+            throw LibrarySyncException("The marks sync file was created by a newer app version")
+        }
+        val merged = MangaMarksMerger.merge(mangaMarkStore.get(), cloud)
+        oneDriveSyncClient.writeDocument(
+            fileName = MangaMarksFile.FILE_NAME,
+            contents = json.encodeToString(merged),
+            etag = remoteDocument.etag,
+        )
+        mangaMarkStore.update { MangaMarksMerger.merge(it, merged) }
+    }
+
+    /** Runs a secondary sync step; returns its error message instead of failing the whole sync. */
+    private suspend fun runStep(step: suspend () -> Unit): String? {
+        return try {
+            step()
+            null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logcat(LogPriority.ERROR, e)
+            e.message ?: e.toString()
+        }
+    }
+
+    private suspend fun syncLibrary(): LibrarySyncResult {
         val now = Clock.System.now().toEpochMilliseconds()
         val remoteDocument = oneDriveSyncClient.readDocument()
         val cloud = readSyncFile(remoteDocument.contents)
@@ -198,6 +290,8 @@ data class LibrarySyncResult(
     val added: Int,
     val removed: Int,
     val total: Int,
+    /** Error of a step after the library sync, which itself succeeded. */
+    val warning: String? = null,
 )
 
 class LibrarySyncException(message: String, cause: Throwable? = null) : IOException(message, cause)

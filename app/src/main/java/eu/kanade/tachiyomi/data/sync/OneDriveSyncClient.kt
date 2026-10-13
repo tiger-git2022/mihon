@@ -105,10 +105,10 @@ class OneDriveSyncClient(
         }
     }
 
-    suspend fun readDocument(): OneDriveSyncDocument {
+    suspend fun readDocument(fileName: String = LIBRARY_FILE): OneDriveSyncDocument {
         val accessToken = acquireAccessToken()
         val request = Request.Builder()
-            .url(SYNC_FILE_URL)
+            .url(fileUrl(fileName))
             .header("Authorization", "Bearer $accessToken")
             .get()
             .build()
@@ -117,7 +117,7 @@ class OneDriveSyncClient(
             when {
                 response.code == 403 || response.code == 404 ->
                     OneDriveSyncDocument(contents = null, etag = null)
-                !response.isSuccessful -> throw response.toGraphException("download")
+                !response.isSuccessful -> throw response.toGraphException("download", fileName)
                 else -> OneDriveSyncDocument(
                     contents = response.body.string(),
                     etag = response.header("ETag"),
@@ -126,10 +126,14 @@ class OneDriveSyncClient(
         }
     }
 
-    suspend fun writeDocument(contents: String, etag: String?) {
+    /**
+     * Writes [contents] to [fileName]. With [etag] the write only succeeds if the file did not
+     * change since it was read; without it, only if the file does not exist yet.
+     */
+    suspend fun writeDocument(fileName: String = LIBRARY_FILE, contents: String, etag: String?) {
         val accessToken = acquireAccessToken()
         val request = Request.Builder()
-            .url(SYNC_FILE_URL)
+            .url(fileUrl(fileName))
             .header("Authorization", "Bearer $accessToken")
             .apply {
                 if (etag != null) {
@@ -146,9 +150,88 @@ class OneDriveSyncClient(
                 response.code == 412 -> throw OneDriveSyncException(
                     "The OneDrive sync file changed on another device. Sync again to merge the latest copy.",
                 )
-                !response.isSuccessful -> throw response.toGraphException("upload")
+                !response.isSuccessful -> throw response.toGraphException("upload", fileName)
             }
         }
+    }
+
+    suspend fun readBytes(fileName: String): ByteArray? {
+        val accessToken = acquireAccessToken()
+        val request = Request.Builder()
+            .url(fileUrl(fileName))
+            .header("Authorization", "Bearer $accessToken")
+            .get()
+            .build()
+
+        return httpClient.newCall(request).await().use { response ->
+            when {
+                response.code == 404 -> null
+                !response.isSuccessful -> throw response.toGraphException("download", fileName)
+                else -> response.body.bytes()
+            }
+        }
+    }
+
+    /** Uploads [bytes] to [fileName], replacing any existing file. */
+    suspend fun writeBytes(fileName: String, bytes: ByteArray) {
+        val accessToken = acquireAccessToken()
+        val request = Request.Builder()
+            .url(fileUrl(fileName))
+            .header("Authorization", "Bearer $accessToken")
+            .put(bytes.toRequestBody(BINARY_MEDIA_TYPE))
+            .build()
+
+        httpClient.newCall(request).await().use { response ->
+            if (!response.isSuccessful) throw response.toGraphException("upload", fileName)
+        }
+    }
+
+    suspend fun deleteFile(fileName: String) {
+        val accessToken = acquireAccessToken()
+        val request = Request.Builder()
+            .url(fileUrl(fileName).removeSuffix(":/content"))
+            .header("Authorization", "Bearer $accessToken")
+            .delete()
+            .build()
+
+        httpClient.newCall(request).await().use { response ->
+            if (!response.isSuccessful && response.code != 404) throw response.toGraphException("delete", fileName)
+        }
+    }
+
+    /** Lists the files in the app folder whose name starts with [prefix]. */
+    suspend fun listFiles(prefix: String): List<OneDriveFile> {
+        val accessToken = acquireAccessToken()
+        val files = mutableListOf<OneDriveFile>()
+        var url: String? = "$APP_FOLDER_URL/children?\$select=name,size,lastModifiedDateTime&\$top=200"
+        while (url != null) {
+            val request = Request.Builder()
+                .url(url)
+                .header("Authorization", "Bearer $accessToken")
+                .get()
+                .build()
+            url = httpClient.newCall(request).await().use { response ->
+                if (response.code == 404) return files
+                if (!response.isSuccessful) throw response.toGraphException("list", "app folder")
+                val json = JSONObject(response.body.string())
+                val items = json.optJSONArray("value")
+                for (index in 0..<(items?.length() ?: 0)) {
+                    val item = items!!.getJSONObject(index)
+                    val name = item.optString("name")
+                    if (!name.startsWith(prefix)) continue
+                    files += OneDriveFile(
+                        name = name,
+                        size = item.optLong("size"),
+                        lastModified = item.optString("lastModifiedDateTime")
+                            .takeIf(String::isNotBlank)
+                            ?.let { runCatching { kotlin.time.Instant.parse(it).toEpochMilliseconds() }.getOrNull() }
+                            ?: 0L,
+                    )
+                }
+                json.optString("@odata.nextLink").takeIf(String::isNotBlank)
+            }
+        }
+        return files
     }
 
     private suspend fun acquireAccessToken(): String {
@@ -223,7 +306,11 @@ class OneDriveSyncClient(
         name = username.ifBlank { id },
     )
 
-    private fun Response.toGraphException(operation: String): OneDriveSyncException {
+    private fun fileUrl(fileName: String): String {
+        return "$APP_FOLDER_URL:/${URLEncoder.encode(fileName, "UTF-8").replace("+", "%20")}:/content"
+    }
+
+    private fun Response.toGraphException(operation: String, fileName: String): OneDriveSyncException {
         val graphError = runCatching {
             JSONObject(body.string()).optJSONObject("error")
         }.getOrNull()
@@ -231,24 +318,34 @@ class OneDriveSyncClient(
         val graphMessage = graphError?.optString("message")?.takeIf(String::isNotBlank)
         val details = listOfNotNull(graphCode, graphMessage).joinToString(": ")
         val message = buildString {
-            append("Could not $operation the OneDrive sync file (HTTP $code)")
+            append("Could not $operation $fileName on OneDrive (HTTP $code)")
             if (details.isNotBlank()) append(": $details")
         }
         Log.e("OneDriveSync", message)
         return OneDriveSyncException(message)
     }
 
-    private companion object {
-        val SCOPES = listOf("Files.ReadWrite")
-        val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
-        const val SYNC_FILE_URL =
-            "https://graph.microsoft.com/v1.0/me/drive/special/approot:/mihon-library-sync.json:/content"
+    companion object {
+        /** Library membership, see [LibrarySyncService]. */
+        const val LIBRARY_FILE = "mihon-library-sync.json"
+
+        private val SCOPES = listOf("Files.ReadWrite")
+        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+        private val BINARY_MEDIA_TYPE = "application/octet-stream".toMediaType()
+        private const val APP_FOLDER_URL = "https://graph.microsoft.com/v1.0/me/drive/special/approot"
     }
 }
 
 data class OneDriveAccount(
     val id: String,
     val name: String,
+)
+
+data class OneDriveFile(
+    val name: String,
+    val size: Long,
+    /** Epoch milliseconds, 0 if unknown. */
+    val lastModified: Long,
 )
 
 data class OneDriveSyncDocument(

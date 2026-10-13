@@ -2,8 +2,13 @@
 
 基于 [mihonapp/mihon](https://github.com/mihonapp/mihon) 的个人分支，`custom` 分支在上游基础上增加：
 
-- **OneDrive 书架同步**：设置 → 数据和存储 → 书架同步；书架页工具栏的同步按钮。
-- **全局搜索历史**。
+- **OneDrive 同步**（设置 → 数据和存储 → 书架同步；书架页工具栏的同步按钮）。一次同步包括：
+  - 书架的添加和移除；
+  - 全局搜索记录（标注来自哪台设备）；
+  - “看过”标记；
+  - 本机设置备份（每台设备一份，可在“从 OneDrive 恢复设置”里选择任一设备的备份恢复；不含书架、历史和登录信息）。
+- **全局搜索记录**：双栏显示，长关键词自动换行。
+- **“看过”标记**：漫画详情页的“标记看过”按钮，和书架互不影响（移出书架后仍保留）。浏览书源和全局搜索结果的封面上用眼睛角标显示。E-Hentai 系画廊按画廊 ID 匹配，E-Hentai 和 ExHentai 通用。
 
 `main` 分支与上游保持一致，不在上面开发。
 
@@ -69,13 +74,15 @@ Azure 门户添加 Android 平台时填“包名”和“签名哈希”（未�
 
 - 独立文件：`eu/kanade/tachiyomi/data/sync/*`、`LibrarySyncSettings.kt`、`LibrarySyncActionState.kt`、
   `GlobalSearchHistoryPreferences.kt`、`GlobalSearchHistoryContent.kt`、`SearchHistory.kt`、`ForkVersion.kt`、
+  `MangaMarkBadges.kt`、`ReadMarkActionButton.kt`、
   `i18n/.../strings_tiger.xml`、`app/src/release/res/values/strings_tiger.xml`、`app/proguard-tiger.pro`、
   `.github/workflows/tiger-*.yml`
 - 改动的上游文件（每处只有几行）：`app/build.gradle.kts`（文件末尾的 `region Fork` 块和 msal 依赖）、
   `settings.gradle.kts`（末尾的 `region Fork` 块）、`gradle/build-logic/build.gradle.kts`、`gradle/libs.versions.toml`、
   `AndroidManifest.xml`、`AppGraph.kt`、`SettingsDataScreen.kt`、`LibraryTab.kt`、`LibraryToolbar.kt`、`AppBar.kt`、
   `GlobalSearchScreen.kt`（两处）、`GlobalSearchViewModel.kt`、`SearchViewModel.kt`、`AppUpdateChecker.kt`、
-  `GetApplicationRelease.kt`
+  `GetApplicationRelease.kt`、`MangaInfoHeader.kt`（`MangaActionRow` 的 `extraActions` 参数）、`MangaScreen.kt`、
+  `BrowseSourceCompactGrid.kt`、`BrowseSourceComfortableGrid.kt`、`BrowseSourceList.kt`、`GlobalSearchCardRow.kt`（角标）
 
 手动合并：
 

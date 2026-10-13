@@ -185,6 +185,7 @@ fun MangaActionRow(
     onEditIntervalClicked: (() -> Unit)?,
     onEditCategory: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    extraActions: @Composable RowScope.() -> Unit = {},
 ) {
     val defaultActionButtonColor = MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_ALPHA)
 
@@ -234,6 +235,7 @@ fun MangaActionRow(
             color = if (trackingCount == 0) defaultActionButtonColor else MaterialTheme.colorScheme.primary,
             onClick = onTrackingClicked,
         )
+        extraActions()
         if (onWebViewClicked != null) {
             MangaActionButton(
                 title = stringResource(MR.strings.action_web_view),
@@ -719,7 +721,7 @@ private fun TagsChip(
 }
 
 @Composable
-private fun RowScope.MangaActionButton(
+internal fun RowScope.MangaActionButton(
     title: String,
     icon: ImageVector,
     color: Color,

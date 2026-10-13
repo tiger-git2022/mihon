@@ -28,6 +28,7 @@ import eu.kanade.tachiyomi.data.library.MetadataUpdateWorker
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.sync.LibrarySyncPreferences
 import eu.kanade.tachiyomi.data.sync.LibrarySyncService
+import eu.kanade.tachiyomi.data.sync.MangaMarkStore
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.data.updater.AppUpdateChecker
 import eu.kanade.tachiyomi.extension.ExtensionManager
@@ -101,6 +102,7 @@ interface AppGraph : ViewModelGraph {
 
     val downloadManager: DownloadManager
     val librarySyncService: LibrarySyncService
+    val mangaMarkStore: MangaMarkStore
 
     val updateChecker: AppUpdateChecker
 

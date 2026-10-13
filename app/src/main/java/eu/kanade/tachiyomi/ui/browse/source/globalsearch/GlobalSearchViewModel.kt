@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.ui.browse.source.globalsearch
 
+import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedFactory
@@ -8,11 +9,18 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactoryKey
 import eu.kanade.domain.source.service.SourcePreferences
+import eu.kanade.tachiyomi.data.sync.LibrarySyncPreferences
+import eu.kanade.tachiyomi.data.sync.SearchHistoryEntry
+import eu.kanade.tachiyomi.data.sync.SearchHistoryMerger
+import eu.kanade.tachiyomi.data.sync.SyncDevice
 import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.source.Source
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import tachiyomi.domain.manga.interactor.GetManga
 import tachiyomi.domain.manga.interactor.NetworkToLocalManga
 import tachiyomi.domain.source.service.SourceManager
+import kotlin.time.Clock
 
 @AssistedInject
 class GlobalSearchViewModel(
@@ -25,10 +33,12 @@ class GlobalSearchViewModel(
     getManga: GetManga,
     preferences: SourcePreferences,
     private val searchHistoryPreferences: GlobalSearchHistoryPreferences,
+    private val librarySyncPreferences: LibrarySyncPreferences,
 ) : SearchViewModel(
     initialState = State(
         searchQuery = initialQuery,
-        searchHistory = searchHistoryPreferences.globalSearchHistory.get(),
+        searchHistory = searchHistoryPreferences.entries.get()
+            .toSearchHistoryItems(librarySyncPreferences.currentDevice()),
         sourceFilter = if (sourcePreferences.pinnedSources.get().isEmpty()) {
             SourceFilter.All
         } else {
@@ -66,25 +76,43 @@ class GlobalSearchViewModel(
             .filter { state.value.sourceFilter != SourceFilter.PinnedOnly || "${it.id}" in pinnedSources }
     }
 
+    // region Fork: global search history
+    init {
+        // Also picks up entries synced from other devices
+        searchHistoryPreferences.entries.changes()
+            .onEach { entries ->
+                val items = entries.toSearchHistoryItems(librarySyncPreferences.currentDevice())
+                updateState { it.copy(searchHistory = items) }
+            }
+            .launchIn(viewModelScope)
+    }
+
     override fun search() {
         val query = state.value.searchQuery?.trim().orEmpty()
         if (query.isEmpty()) return
 
         updateSearchQuery(query)
-        updateSearchHistory(searchHistoryPreferences.globalSearchHistory.get().withSearchQuery(query))
+        updateSearchHistory { entries, device, now -> entries.withSearchQuery(query, device, now) }
         super.search()
     }
 
     fun removeSearchHistory(query: String) {
-        updateSearchHistory(state.value.searchHistory - query)
+        updateSearchHistory { entries, device, now -> entries.withoutSearchQuery(query, device, now) }
     }
 
     fun clearSearchHistory() {
-        updateSearchHistory(emptyList())
+        val now = Clock.System.now().toEpochMilliseconds()
+        searchHistoryPreferences.update { _, clearedAt -> SearchHistoryState(emptyList(), maxOf(clearedAt, now)) }
     }
 
-    private fun updateSearchHistory(history: List<String>) {
-        searchHistoryPreferences.globalSearchHistory.set(history)
-        updateState { it.copy(searchHistory = history) }
+    private fun updateSearchHistory(
+        transform: (List<SearchHistoryEntry>, SyncDevice, Long) -> List<SearchHistoryEntry>,
+    ) {
+        val now = Clock.System.now().toEpochMilliseconds()
+        val device = librarySyncPreferences.currentDevice()
+        searchHistoryPreferences.update { entries, clearedAt ->
+            SearchHistoryState(SearchHistoryMerger.prune(transform(entries, device, now), now), clearedAt)
+        }
     }
+    // endregion
 }

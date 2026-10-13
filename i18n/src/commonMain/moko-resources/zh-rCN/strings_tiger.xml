@@ -16,6 +16,16 @@
     <string name="library_sync_sign_out_failed">退出 OneDrive 登录失败：%s</string>
     <string name="library_sync_success">同步完成：添加 %1$d 部，移除 %2$d 部，书架共 %3$d 部</string>
     <string name="library_sync_failed">书架同步失败：%s</string>
-    <string name="library_sync_info">将书架的添加和移除记录保存在应用专属的 OneDrive 文件夹中。在每台设备上登录同一个微软账号，并依次同步，不要同时同步。分类、阅读进度、下载和搜索历史不会同步。</string>
+    <string name="library_sync_info">通过应用专属的 OneDrive 文件夹同步书架的添加和移除、全局搜索记录、“看过”标记，并为每台设备保存一份设置备份。在每台设备上登录同一个微软账号，并依次同步，不要同时同步。分类、阅读进度和下载不会同步。</string>
     <string name="library_sync_redirect_uri">本安装包的 Azure 重定向 URI：%s</string>
+    <string name="sync_from_device">来自 %s</string>
+    <string name="library_sync_partial_failure">%1$s。部分内容同步失败：%2$s</string>
+    <string name="library_sync_device_name">本机名称</string>
+    <string name="library_sync_restore_settings">从 OneDrive 恢复设置</string>
+    <string name="library_sync_restore_settings_summary">每台设备同步时都会上传自己的设置</string>
+    <string name="library_sync_no_settings_backups">OneDrive 上还没有设置备份。在任一设备上同步一次即可上传它的设置。</string>
+    <string name="library_sync_restore_settings_confirm">用 %1$s 在 %2$s 备份的设置替换本机设置？书架、历史记录和登录状态不受影响。</string>
+    <string name="library_sync_restore_started">正在恢复设置…</string>
+    <string name="manga_mark_as_read">标记看过</string>
+    <string name="manga_mark_read">看过</string>
 </resources>

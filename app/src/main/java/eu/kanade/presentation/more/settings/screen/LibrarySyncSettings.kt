@@ -3,6 +3,15 @@ package eu.kanade.presentation.more.settings.screen
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -10,8 +19,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import eu.kanade.presentation.more.settings.Preference
+import eu.kanade.tachiyomi.data.sync.SettingsBackup
+import eu.kanade.tachiyomi.ui.library.librarySyncMessage
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -23,6 +35,8 @@ import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.collectAsState
+import java.text.DateFormat
+import java.util.Date
 
 /**
  * OneDrive library sync settings group (fork-only feature), shown in [SettingsDataScreen].
@@ -51,6 +65,24 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
     } else {
         stringResource(MR.strings.library_sync_signed_in_as, accountName)
     }
+
+    var restoreDialog by remember { mutableStateOf<RestoreDialog?>(null) }
+    SettingsRestoreDialog(
+        state = restoreDialog,
+        onStateChange = { restoreDialog = it },
+        loadBackups = { withContext(Dispatchers.IO) { service.listSettingsBackups() } },
+        onRestore = { backup ->
+            restoreDialog = null
+            scope.launch {
+                runCatching { service.restoreSettings(backup) }
+                    .onSuccess { context.toast(MR.strings.library_sync_restore_started) }
+                    .onFailure { error ->
+                        logcat(LogPriority.ERROR, error)
+                        context.toast(context.stringResource(MR.strings.library_sync_failed, error.message.orEmpty()))
+                    }
+            }
+        },
+    )
 
     // TextPreference has no "enabled" flag, so a null click handler disables the item.
     fun action(block: suspend () -> Unit): (() -> Unit)? {
@@ -107,14 +139,7 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
                             runCatching {
                                 withContext(Dispatchers.IO) { service.sync() }
                             }.onSuccess { result ->
-                                context.toast(
-                                    context.stringResource(
-                                        MR.strings.library_sync_success,
-                                        result.added,
-                                        result.removed,
-                                        result.total,
-                                    ),
-                                )
+                                context.toast(context.librarySyncMessage(result))
                             }.onFailure { error ->
                                 logcat(LogPriority.ERROR, error)
                                 context.toast(
@@ -125,6 +150,13 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
                                 )
                             }
                         },
+                    ),
+                )
+                add(
+                    Preference.PreferenceItem.TextPreference(
+                        title = stringResource(MR.strings.library_sync_restore_settings),
+                        subtitle = stringResource(MR.strings.library_sync_restore_settings_summary),
+                        onClick = if (isBusy) null else ({ restoreDialog = RestoreDialog.Loading }),
                     ),
                 )
                 add(
@@ -148,6 +180,12 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
                     ),
                 )
             }
+            add(
+                Preference.PreferenceItem.EditTextPreference(
+                    preference = preferences.deviceName,
+                    title = stringResource(MR.strings.library_sync_device_name),
+                ),
+            )
             add(Preference.PreferenceItem.InfoPreference(stringResource(MR.strings.library_sync_info)))
             if (accountName.isBlank()) {
                 add(
@@ -164,4 +202,81 @@ private fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+private sealed interface RestoreDialog {
+    data object Loading : RestoreDialog
+    data class Backups(val backups: List<SettingsBackup>) : RestoreDialog
+    data class Failed(val message: String) : RestoreDialog
+    data class Confirm(val backup: SettingsBackup) : RestoreDialog
+}
+
+@Composable
+private fun SettingsRestoreDialog(
+    state: RestoreDialog?,
+    onStateChange: (RestoreDialog?) -> Unit,
+    loadBackups: suspend () -> List<SettingsBackup>,
+    onRestore: (SettingsBackup) -> Unit,
+) {
+    if (state == null) return
+    val dismiss = { onStateChange(null) }
+
+    if (state == RestoreDialog.Loading) {
+        LaunchedEffect(Unit) {
+            onStateChange(
+                runCatching { loadBackups() }.fold(
+                    onSuccess = { RestoreDialog.Backups(it) },
+                    onFailure = { RestoreDialog.Failed(it.message ?: it.toString()) },
+                ),
+            )
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text(stringResource(MR.strings.library_sync_restore_settings)) },
+        text = {
+            when (state) {
+                RestoreDialog.Loading -> CircularProgressIndicator()
+                is RestoreDialog.Failed -> Text(state.message)
+                is RestoreDialog.Backups -> if (state.backups.isEmpty()) {
+                    Text(stringResource(MR.strings.library_sync_no_settings_backups))
+                } else {
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        state.backups.forEach { backup ->
+                            ListItem(
+                                headlineContent = { Text(backup.deviceName) },
+                                supportingContent = { Text(backup.updatedAt.toDateTimeString()) },
+                                modifier = Modifier.clickable { onStateChange(RestoreDialog.Confirm(backup)) },
+                            )
+                        }
+                    }
+                }
+                is RestoreDialog.Confirm -> Text(
+                    stringResource(
+                        MR.strings.library_sync_restore_settings_confirm,
+                        state.backup.deviceName,
+                        state.backup.updatedAt.toDateTimeString(),
+                    ),
+                )
+            }
+        },
+        confirmButton = {
+            if (state is RestoreDialog.Confirm) {
+                TextButton(onClick = { onRestore(state.backup) }) {
+                    Text(stringResource(MR.strings.action_restore))
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = dismiss) {
+                Text(stringResource(MR.strings.action_cancel))
+            }
+        },
+    )
+}
+
+private fun Long.toDateTimeString(): String {
+    if (this <= 0L) return "-"
+    return DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(this))
 }
