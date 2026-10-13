@@ -124,6 +124,7 @@ data object LibraryTab : Tab {
                     onClickFilter = viewModel::showSettingsDialog,
                     onClickLibrarySync = librarySync.onClick,
                     isLibrarySyncing = librarySync.isSyncing,
+                    librarySyncProgress = librarySync.progressText,
                     onClickRefresh = { scope.launch { onClickRefresh(state.activeCategory) } },
                     onClickGlobalUpdate = { scope.launch { onClickRefresh(null) } },
                     onClickOpenRandomManga = {

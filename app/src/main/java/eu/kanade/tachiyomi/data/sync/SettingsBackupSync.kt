@@ -29,8 +29,9 @@ class SettingsBackupSync(
     private val oneDriveSyncClient: OneDriveSyncClient,
 ) {
 
-    suspend fun upload(device: SyncDevice) {
+    suspend fun upload(device: SyncDevice, onStage: (SettingsBackupStage) -> Unit = {}) {
         val fileName = fileName(device)
+        onStage(SettingsBackupStage.CREATE)
         val bytes = withContext(Dispatchers.IO) {
             val file = File(context.cacheDir, "tiger-settings-backup.tachibk")
             try {
@@ -42,6 +43,7 @@ class SettingsBackupSync(
                 file.delete()
             }
         }
+        onStage(SettingsBackupStage.UPLOAD)
         oneDriveSyncClient.writeBytes(fileName, bytes)
 
         // Remove backups this device uploaded under an earlier name
@@ -142,6 +144,11 @@ class SettingsBackupSync(
             sourceSettings = true,
         )
     }
+}
+
+enum class SettingsBackupStage {
+    CREATE,
+    UPLOAD,
 }
 
 data class SettingsBackup(

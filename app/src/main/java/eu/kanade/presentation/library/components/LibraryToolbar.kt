@@ -36,6 +36,7 @@ fun LibraryToolbar(
     onClickFilter: () -> Unit,
     onClickLibrarySync: () -> Unit,
     isLibrarySyncing: Boolean,
+    librarySyncProgress: String?,
     onClickRefresh: () -> Unit,
     onClickGlobalUpdate: () -> Unit,
     onClickOpenRandomManga: () -> Unit,
@@ -57,6 +58,7 @@ fun LibraryToolbar(
         onClickFilter = onClickFilter,
         onClickLibrarySync = onClickLibrarySync,
         isLibrarySyncing = isLibrarySyncing,
+        librarySyncProgress = librarySyncProgress,
         onClickRefresh = onClickRefresh,
         onClickGlobalUpdate = onClickGlobalUpdate,
         onClickOpenRandomManga = onClickOpenRandomManga,
@@ -73,6 +75,7 @@ private fun LibraryRegularToolbar(
     onClickFilter: () -> Unit,
     onClickLibrarySync: () -> Unit,
     isLibrarySyncing: Boolean,
+    librarySyncProgress: String?,
     onClickRefresh: () -> Unit,
     onClickGlobalUpdate: () -> Unit,
     onClickOpenRandomManga: () -> Unit,
@@ -110,13 +113,10 @@ private fun LibraryRegularToolbar(
                         onClick = onClickFilter,
                     ),
                     AppBar.Action(
-                        title = stringResource(
-                            if (isLibrarySyncing) {
-                                MR.strings.library_sync_syncing
-                            } else {
-                                MR.strings.library_sync_now
-                            },
-                        ),
+                        title = when {
+                            !isLibrarySyncing -> stringResource(MR.strings.library_sync_now)
+                            else -> librarySyncProgress ?: stringResource(MR.strings.library_sync_syncing)
+                        },
                         icon = MaterialSymbols.Rounded.Sync,
                         onClick = onClickLibrarySync,
                         enabled = !isLibrarySyncing,

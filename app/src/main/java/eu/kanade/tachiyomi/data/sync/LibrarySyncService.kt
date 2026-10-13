@@ -7,6 +7,9 @@ import dev.zacsweers.metro.SingleIn
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.GlobalSearchHistoryPreferences
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SearchHistoryState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.decodeFromString
@@ -34,6 +37,11 @@ class LibrarySyncService(
 ) {
     private val syncMutex = Mutex()
 
+    private val _progress = MutableStateFlow<LibrarySyncProgress?>(null)
+
+    /** Progress of the running sync, null when no sync runs. */
+    val progress: StateFlow<LibrarySyncProgress?> = _progress.asStateFlow()
+
     val redirectUri: String
         get() = oneDriveSyncClient.redirectUri
 
@@ -55,18 +63,27 @@ class LibrarySyncService(
      * backup. A failure after the library step is reported in [LibrarySyncResult.warning].
      */
     suspend fun sync(): LibrarySyncResult = syncMutex.withLock {
-        val account = oneDriveSyncClient.currentAccount()
-            ?: throw LibrarySyncException("Sign in to OneDrive before syncing")
-        updateAccount(account)
-        val device = preferences.currentDevice()
+        try {
+            _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.LIBRARY)
+            val account = oneDriveSyncClient.currentAccount()
+                ?: throw LibrarySyncException("Sign in to OneDrive before syncing")
+            updateAccount(account)
+            val device = preferences.currentDevice()
 
-        val result = syncLibrary()
-        val warnings = listOfNotNull(
-            runStep { syncSearchHistory(device) },
-            runStep { syncMarks() },
-            runStep { settingsBackupSync.upload(device) },
-        )
-        result.copy(warning = warnings.takeIf { it.isNotEmpty() }?.joinToString("; "))
+            val result = syncLibrary()
+            val warnings = listOfNotNull(
+                runStep(LibrarySyncProgress.Step.SEARCH_HISTORY) { syncSearchHistory(device) },
+                runStep(LibrarySyncProgress.Step.MARKS) { syncMarks() },
+                runStep(LibrarySyncProgress.Step.SETTINGS_BACKUP) {
+                    settingsBackupSync.upload(device) { stage ->
+                        _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.SETTINGS_BACKUP, stage = stage)
+                    }
+                },
+            )
+            result.copy(warning = warnings.takeIf { it.isNotEmpty() }?.joinToString("; "))
+        } finally {
+            _progress.value = null
+        }
     }
 
     suspend fun listSettingsBackups(): List<SettingsBackup> = settingsBackupSync.list()
@@ -122,8 +139,9 @@ class LibrarySyncService(
     }
 
     /** Runs a secondary sync step; returns its error message instead of failing the whole sync. */
-    private suspend fun runStep(step: suspend () -> Unit): String? {
+    private suspend fun runStep(progressStep: LibrarySyncProgress.Step, step: suspend () -> Unit): String? {
         return try {
+            _progress.value = LibrarySyncProgress(progressStep)
             step()
             null
         } catch (e: CancellationException) {
@@ -193,10 +211,14 @@ class LibrarySyncService(
         val cloudByKey = cloud.entries.associateBy(LibrarySyncEntry::key)
         val baselineByKey = baseline?.entries.orEmpty().associateBy(LibrarySyncEntry::key)
         val keys = favoriteByKey.keys + cloudByKey.keys + baselineByKey.keys
+        // Comparing and then applying each entry: about twice the number of entries
+        var compared = 0
+        val progressTotal = keys.size * 2
         val entries = mutableMapOf<LibrarySyncKey, LibrarySyncEntry>()
         val mangaByKey = mutableMapOf<LibrarySyncKey, Manga?>()
 
         for (key in keys) {
+            _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.LIBRARY, compared++, progressTotal)
             val existing = favoriteByKey[key]
                 ?: mangaRepository.getMangaByUrlAndSourceId(key.mangaUrl, key.sourceId)
             mangaByKey[key] = existing
@@ -237,7 +259,10 @@ class LibrarySyncService(
         var added = 0
         var removed = 0
 
-        for (entry in merged.entries) {
+        val compared = knownManga.size
+        val progressTotal = compared + merged.entries.size
+        for ((index, entry) in merged.entries.withIndex()) {
+            _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.LIBRARY, compared + index, progressTotal)
             val existing = knownManga[entry.key]
                 ?: mangaRepository.getMangaByUrlAndSourceId(entry.mangaUrl, entry.sourceId)
             when {
@@ -284,6 +309,28 @@ class LibrarySyncService(
         val entries: Map<LibrarySyncKey, LibrarySyncEntry>,
         val mangaByKey: Map<LibrarySyncKey, Manga?>,
     )
+}
+
+data class LibrarySyncProgress(
+    val step: Step,
+    /** Entries done and total, for steps that report them; 0 of 0 otherwise. */
+    val done: Int = 0,
+    val total: Int = 0,
+    val stage: SettingsBackupStage? = null,
+) {
+    enum class Step(val number: Int) {
+        LIBRARY(1),
+        SEARCH_HISTORY(2),
+        MARKS(3),
+        SETTINGS_BACKUP(4),
+    }
+
+    val percent: Int?
+        get() = if (total > 0) (done * 100 / total).coerceIn(0, 100) else null
+
+    companion object {
+        const val STEP_COUNT = 4
+    }
 }
 
 data class LibrarySyncResult(
