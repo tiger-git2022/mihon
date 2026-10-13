@@ -9,6 +9,8 @@ import eu.kanade.tachiyomi.data.backup.restore.BackupRestoreWorker
 import eu.kanade.tachiyomi.data.backup.restore.RestoreOptions
 import eu.kanade.tachiyomi.util.system.workManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -56,10 +58,23 @@ class SettingsBackupSync(
 
     /** Downloads [backup] and starts restoring it like a regular backup restore. */
     suspend fun restore(backup: SettingsBackup) {
-        // A second restore request would be dropped while one is running
-        if (BackupRestoreWorker.isRunning(context.workManager)) {
-            throw OneDriveSyncException("A restore is already in progress")
+        // The restore worker is unique work that keeps the existing request, so a second request
+        // made while one is downloading, queued or running would be dropped silently
+        if (!restoreMutex.tryLock()) throw OneDriveSyncException(RESTORE_IN_PROGRESS)
+        try {
+            if (hasUnfinishedRestore()) throw OneDriveSyncException(RESTORE_IN_PROGRESS)
+            downloadAndRestore(backup)
+        } finally {
+            restoreMutex.unlock()
         }
+    }
+
+    private suspend fun hasUnfinishedRestore(): Boolean {
+        return context.workManager.getWorkInfosForUniqueWorkFlow(RESTORE_WORK_NAME).first()
+            .any { !it.state.isFinished }
+    }
+
+    private suspend fun downloadAndRestore(backup: SettingsBackup) {
         val bytes = oneDriveSyncClient.readBytes(backup.fileName)
             ?: throw OneDriveSyncException("The settings backup no longer exists on OneDrive")
         val file = withContext(Dispatchers.IO) {
@@ -95,6 +110,12 @@ class SettingsBackupSync(
     private fun String.idPrefix() = filter { it.isLetterOrDigit() }.take(8).lowercase()
 
     private companion object {
+        val restoreMutex = Mutex()
+
+        // Unique work name of BackupRestoreWorker
+        const val RESTORE_WORK_NAME = "BackupRestore"
+        const val RESTORE_IN_PROGRESS = "A restore is already in progress"
+
         const val FILE_PREFIX = "mihon-settings-"
         const val RESTORE_FILE_PREFIX = "tiger-settings-restore-"
         const val STALE_RESTORE_FILE_MILLIS = 24L * 60 * 60 * 1000
