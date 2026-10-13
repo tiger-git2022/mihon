@@ -454,3 +454,34 @@ androidComponents {
         it.packaging.resources.excludes.add("META-INF/*.version")
     }
 }
+
+// region Fork (tiger-git2022/mihon)
+// Fork-only build configuration, kept in this block at the end of the file to simplify upstream
+// merges. Do not change the versionCode/versionName lines above: upstream bumps them on every release.
+android {
+    buildTypes {
+        named("release") {
+            // Installs side by side with the official Mihon release (app.mihon)
+            applicationIdSuffix = ".tiger"
+        }
+        configureEach {
+            proguardFile("proguard-tiger.pro")
+        }
+    }
+}
+
+// CI passes -Ptiger.buildNumber=N (see .github/workflows/tiger-release.yml). The release build then
+// gets versionName "<upstream versionName>-tN" and versionCode "<upstream versionCode> * 1000 + N".
+val tigerBuildNumber = providers.gradleProperty("tiger.buildNumber").orNull?.toInt()
+if (tigerBuildNumber != null) {
+    require(tigerBuildNumber in 1..999) { "tiger.buildNumber must be between 1 and 999" }
+    androidComponents {
+        onVariants(selector().withBuildType("release")) { variant ->
+            variant.outputs.forEach { output ->
+                output.versionName.set(output.versionName.map { "$it-t$tigerBuildNumber" })
+                output.versionCode.set(output.versionCode.map { (it ?: 0) * 1000 + tigerBuildNumber })
+            }
+        }
+    }
+}
+// endregion

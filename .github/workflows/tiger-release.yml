@@ -1,0 +1,225 @@
+# Fork (tiger-git2022/mihon): build signed release APKs and publish them as a GitHub Release.
+#
+# Version scheme: tag/versionName "v<upstream versionName>-t<N>", versionCode
+# "<upstream versionCode> * 1000 + N". N starts at 1 for every upstream version and increases with
+# each release of it, so versionCode always increases. The in-app updater compares versions the
+# same way (domain/.../release/interactor/ForkVersion.kt).
+name: Tiger Release
+
+on:
+  push:
+    branches:
+      - custom
+    paths-ignore:
+      - '**.md'
+      - 'fastlane/**'
+      - '.github/ISSUE_TEMPLATE/**'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Release even if this commit has already been released'
+        type: boolean
+        default: false
+      skip_tests:
+        description: 'Skip unit tests'
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      ref:
+        description: 'Branch to release'
+        type: string
+        default: custom
+      skip_tests:
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & publish release
+    runs-on: ubuntu-26.04
+    # One release at a time, so build numbers never collide
+    concurrency:
+      group: tiger-release
+      cancel-in-progress: false
+
+    env:
+      # Enables the env based signing config in app/build.gradle.kts
+      MIHON_GITHUB_RELEASE: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Compute version
+        id: version
+        env:
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+
+          existing=$(git tag --points-at HEAD --list 'v*-t*' | head -n 1)
+          if [ -n "$existing" ] && [ "$FORCE" != "true" ]; then
+            echo "Commit $(git rev-parse --short HEAD) was already released as $existing, skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          upstream_name=$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)".*/\1/p' app/build.gradle.kts | head -n 1)
+          upstream_code=$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+).*/\1/p' app/build.gradle.kts | head -n 1)
+          if [ -z "$upstream_name" ] || [ -z "$upstream_code" ]; then
+            echo "::error::Could not read versionName/versionCode from app/build.gradle.kts"
+            exit 1
+          fi
+
+          last=$(git tag --list "v${upstream_name}-t*" | sed -E "s/^v.*-t//" | grep -E '^[0-9]+$' | sort -n | tail -n 1 || true)
+          build=$(( ${last:-0} + 1 ))
+          version_name="${upstream_name}-t${build}"
+          version_code=$(( upstream_code * 1000 + build ))
+          previous=$(git describe --tags --abbrev=0 --match 'v*-t*' HEAD 2>/dev/null || true)
+
+          {
+            echo "skip=false"
+            echo "upstream_name=$upstream_name"
+            echo "build=$build"
+            echo "version_name=$version_name"
+            echo "version_code=$version_code"
+            echo "tag=v$version_name"
+            echo "previous=$previous"
+          } >> "$GITHUB_OUTPUT"
+          echo "Releasing v$version_name (versionCode $version_code), previous release: ${previous:-none}"
+
+      - name: Set up JDK
+        if: steps.version.outputs.skip != 'true'
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          java-version-file: .github/.java-version
+          distribution: temurin
+
+      - name: Set up Gradle
+        if: steps.version.outputs.skip != 'true'
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      - name: Decode signing keystore
+        if: steps.version.outputs.skip != 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Secret KEYSTORE_BASE64 is not set"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+
+          # Signature hash used by MSAL: Base64(SHA-1(signing certificate))
+          hash=$(keytool -exportcert -alias "$KEY_ALIAS" -keystore "$RUNNER_TEMP/release.keystore" \
+            -storepass "$KEYSTORE_PASSWORD" | openssl sha1 -binary | openssl base64 -A)
+          encoded=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$hash")
+          echo "SIGNATURE_HASH=$hash" >> "$GITHUB_ENV"
+          echo "REDIRECT_URI=msauth://app.mihon.tiger/$encoded" >> "$GITHUB_ENV"
+
+      - name: Run unit tests
+        if: steps.version.outputs.skip != 'true' && !inputs.skip_tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: Build signed release APKs
+        if: steps.version.outputs.skip != 'true'
+        env:
+          storeFile: ${{ runner.temp }}/release.keystore
+          storePassword: ${{ secrets.KEYSTORE_PASSWORD }}
+          keyAlias: ${{ secrets.KEY_ALIAS }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+        run: >-
+          ./gradlew assembleRelease
+          -Ptiger.buildNumber=${{ steps.version.outputs.build }}
+          -Pinclude-telemetry=false
+          -Penable-updater=true
+
+      - name: Collect APKs
+        if: steps.version.outputs.skip != 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          out=app/build/outputs/apk/release
+          mkdir -p dist
+          # Asset names must contain the ABI as "-<abi>" (and the universal APK none of them),
+          # that is how the in-app updater picks the APK for the device (ReleaseServiceImpl).
+          mv "$out/app-universal-release.apk" "dist/mihon-tiger-$TAG.apk"
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            mv "$out/app-$abi-release.apk" "dist/mihon-tiger-$abi-$TAG.apk"
+          done
+          ls -l dist
+
+          # Make sure the APKs are signed with the release key
+          apksigner=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
+          "$apksigner" verify --print-certs "dist/mihon-tiger-$TAG.apk" | tee "$RUNNER_TEMP/certs.txt"
+          if grep -q "CN=Android Debug" "$RUNNER_TEMP/certs.txt"; then
+            echo "::error::APK is signed with the debug key"
+            exit 1
+          fi
+
+      - name: Write release notes
+        if: steps.version.outputs.skip != 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          PREVIOUS: ${{ steps.version.outputs.previous }}
+          UPSTREAM: ${{ steps.version.outputs.upstream_name }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+        run: |
+          set -euo pipefail
+          if [ -n "$PREVIOUS" ]; then
+            changes=$(git log --first-parent --pretty='- %s (%h)' "$PREVIOUS..HEAD")
+          else
+            changes=$(git log --first-parent --pretty='- %s (%h)' -n 20 HEAD)
+          fi
+          cat > release-notes.md <<EOF
+          基于上游 [Mihon v$UPSTREAM](https://github.com/mihonapp/mihon/releases/tag/v$UPSTREAM)，附加 OneDrive 书架同步和全局搜索历史。
+
+          ### 本次更新
+          ${changes:-- 无代码改动}
+
+          ### 下载
+          - 大多数手机选 \`mihon-tiger-arm64-v8a-$TAG.apk\`
+          - 不确定就选通用版 \`mihon-tiger-$TAG.apk\`
+
+          包名 \`app.mihon.tiger\`，versionCode $VERSION_CODE，可与官方 Mihon 同时安装。
+
+          <details><summary>签名信息</summary>
+
+          - 签名证书 SHA-1（Base64）：\`$SIGNATURE_HASH\`
+          - MSAL / Azure 重定向 URI：\`$REDIRECT_URI\`
+
+          </details>
+          EOF
+          cat release-notes.md
+          {
+            echo "## $TAG"
+            echo
+            echo "- Azure redirect URI: \`$REDIRECT_URI\`"
+            echo "- Signature hash: \`$SIGNATURE_HASH\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish GitHub Release
+        if: steps.version.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" dist/*.apk \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$(git rev-parse HEAD)" \
+            --title "Mihon Tiger $TAG" \
+            --notes-file release-notes.md \
+            --latest

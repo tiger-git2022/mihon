@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fork (tiger-git2022/mihon): distinguishes this release build from the official Mihon app. -->
+<resources>
+    <string name="app_name" translatable="false">Mihon Tiger</string>
+</resources>

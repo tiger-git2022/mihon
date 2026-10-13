@@ -40,7 +40,8 @@ val GITHUB_REPO: String by lazy {
     if (isNightlyBuildType) {
         "mihonapp/mihon-preview"
     } else {
-        "mihonapp/mihon"
+        // Fork: updates come from this fork's releases
+        "tiger-git2022/mihon"
     }
 }
 
