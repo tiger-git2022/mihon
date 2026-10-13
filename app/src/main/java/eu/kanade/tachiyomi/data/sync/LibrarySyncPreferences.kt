@@ -8,8 +8,8 @@ import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
 import java.util.UUID
 
-// The account, baseline and device keys are app state keys: they belong to this installation and are never
-// part of backups.
+// All keys are app state keys: they belong to this installation and are never part of backups, so restoring
+// another device's settings keeps this device's sync options.
 @Inject
 @SingleIn(AppScope::class)
 class LibrarySyncPreferences(
@@ -41,18 +41,18 @@ class LibrarySyncPreferences(
         defaultDeviceName(),
     )
 
-    // Automatic sync, see LibraryAutoSync. User preferences, so they are part of settings backups.
+    // Automatic sync, see LibraryAutoSync
 
-    val autoSync = preferenceStore.getBoolean(AUTO_SYNC_KEY_PREFIX + "enabled", true)
+    val autoSync = preferenceStore.getBoolean(Preference.appStateKey("library_sync_auto_enabled"), true)
 
     val autoSyncIntervalMinutes = preferenceStore.getInt(
-        AUTO_SYNC_KEY_PREFIX + "interval_minutes",
+        Preference.appStateKey("library_sync_auto_interval_minutes"),
         DEFAULT_AUTO_SYNC_INTERVAL_MINUTES,
     )
 
-    val autoSyncWifiOnly = preferenceStore.getBoolean(AUTO_SYNC_KEY_PREFIX + "wifi_only", false)
+    val autoSyncWifiOnly = preferenceStore.getBoolean(Preference.appStateKey("library_sync_auto_wifi_only"), false)
 
-    val syncOnChange = preferenceStore.getBoolean(AUTO_SYNC_KEY_PREFIX + "on_change", true)
+    val syncOnChange = preferenceStore.getBoolean(Preference.appStateKey("library_sync_auto_on_change"), true)
 
     fun currentDevice(): SyncDevice {
         val id = deviceId.get().ifBlank {
@@ -74,9 +74,6 @@ class LibrarySyncPreferences(
     }
 
     companion object {
-        /** Prefix of the auto sync options; changing them is not a change of the synced settings. */
-        const val AUTO_SYNC_KEY_PREFIX = "library_sync_auto_"
-
         const val DEFAULT_AUTO_SYNC_INTERVAL_MINUTES = 360
 
         /** WorkManager runs periodic work at most every 15 minutes. */

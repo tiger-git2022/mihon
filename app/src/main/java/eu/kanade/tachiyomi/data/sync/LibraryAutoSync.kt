@@ -242,9 +242,8 @@ class LibraryAutoSync(
     }
 
     private fun isSyncedSetting(key: String): Boolean {
-        return !Preference.isAppState(key) &&
-            !Preference.isPrivate(key) &&
-            !key.startsWith(LibrarySyncPreferences.AUTO_SYNC_KEY_PREFIX)
+        // App state keys (sync options included) are not part of the settings backup
+        return !Preference.isAppState(key) && !Preference.isPrivate(key)
     }
 
     private fun isNetworkAllowed(): Boolean {

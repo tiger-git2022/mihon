@@ -17,7 +17,7 @@
   - 全局搜索记录（标注来自哪台设备）；
   - “看过”标记；
   - 本机设置备份（每台设备一份，可在“从 OneDrive 恢复设置”里选择任一设备的备份恢复；不含书架、历史和登录信息）。
-  - 自动同步（默认开启，可关闭）：打开应用时同步一次；按间隔定时同步（15 分钟到 24 小时可选，默认 6 小时）；书架、搜索记录、看过标记或设置改动后，60 秒内没有新改动就同步，最多等 5 分钟；可选“仅在 Wi-Fi 下自动同步”。
+  - 自动同步（默认开启，可关闭）：打开应用时同步一次；按间隔定时同步（15 分钟到 24 小时可选，默认 6 小时）；书架、搜索记录、看过标记或设置改动后，60 秒内没有新改动就同步，最多等 5 分钟；可选“仅在 Wi-Fi 下自动同步”。这些选项只保存在本机，恢复别的设备的设置时不会被覆盖。
 - **全局搜索记录**：双栏显示，长关键词自动换行。
 - **“看过”标记**：漫画详情页的“标记看过”按钮，和书架互不影响（移出书架后仍保留）。浏览书源和全局搜索结果的封面上用眼睛角标显示。E-Hentai 系画廊按画廊 ID 匹配，E-Hentai 和 ExHentai 通用。
 
@@ -120,7 +120,7 @@ Personal fork of [mihonapp/mihon](https://github.com/mihonapp/mihon). The `custo
   - global search history (labelled with the device it came from);
   - "read before" marks;
   - a settings backup per device (restore any device's backup from "Restore settings from OneDrive"; library, history and logins are not included).
-  - automatic sync (on by default): once at app start, periodically (15 min to 24 h, default 6 h), and 60 s after the last change to the library, search history, marks or settings (at most 5 min after the first); optionally only on Wi-Fi.
+  - automatic sync (on by default): once at app start, periodically (15 min to 24 h, default 6 h), and 60 s after the last change to the library, search history, marks or settings (at most 5 min after the first); optionally only on Wi-Fi. These options stay on the device and are not changed by restoring another device's settings.
 - **Global search history** in two columns; long queries wrap.
 - **"Read before" mark**: a button on the manga details page, independent of the library (kept after removing from the library). Shown as an eye badge on covers in Browse and global search. E-Hentai galleries match by gallery ID, so E-Hentai and ExHentai share marks.
 
