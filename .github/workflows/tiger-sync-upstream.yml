@@ -89,7 +89,7 @@ jobs:
             exit 0
           fi
 
-          git commit --no-edit -m "Merge upstream $TAG into $TARGET_BRANCH"
+          git commit --no-edit -m "合并上游 $TAG / Merge upstream $TAG into $TARGET_BRANCH"
           echo "result=merged" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK

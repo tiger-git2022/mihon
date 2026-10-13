@@ -1,5 +1,15 @@
 # Mihon Tiger（tiger-git2022/mihon）
 
+<p align="center">
+  <a href="https://github.com/tiger-git2022/mihon/releases/latest"><img src="https://img.shields.io/github/v/release/tiger-git2022/mihon?style=for-the-badge&label=%E4%B8%8B%E8%BD%BD%E6%9C%80%E6%96%B0%E7%89%88%20%2F%20Download&color=2ea44f" alt="下载最新版 / Download latest"></a>
+</p>
+
+**[⬇ 下载最新 APK / Download the latest APK](https://github.com/tiger-git2022/mihon/releases/latest)**：大多数手机选 `mihon-tiger-arm64-v8a-…apk`，不确定就选通用版 `mihon-tiger-v…apk`。/ Most phones: `mihon-tiger-arm64-v8a-…apk`; if unsure, the universal `mihon-tiger-v…apk`.
+
+[中文](#中文) | [English](#english) | [上游 Mihon 说明 / Upstream README](../README.md)
+
+## 中文
+
 基于 [mihonapp/mihon](https://github.com/mihonapp/mihon) 的个人分支，`custom` 分支在上游基础上增加：
 
 - **OneDrive 同步**（设置 → 数据和存储 → 书架同步；书架页工具栏的同步按钮）。一次同步包括：
@@ -12,7 +22,7 @@
 
 `main` 分支与上游保持一致，不在上面开发。
 
-## 下载
+### 下载
 
 <https://github.com/tiger-git2022/mihon/releases/latest>
 
@@ -22,7 +32,7 @@
 release 包的包名是 `app.mihon.tiger`，应用名 “Mihon Tiger”，可以和官方 Mihon（`app.mihon`）同时安装。
 应用启动时自动检查本仓库的新版本，“关于”页可以手动检查。
 
-## 版本号
+### 版本号
 
 | | 规则 | 例子 |
 |---|---|---|
@@ -33,7 +43,7 @@ N 对每个上游版本从 1 开始，每次发布加 1，所以 versionCode 一
 `app/build.gradle.kts` 里上游的 `versionCode`/`versionName` 两行不要改，构建号由 CI 通过 `-Ptiger.buildNumber=N` 传入。
 应用内的版本比较见 `domain/src/main/java/tachiyomi/domain/release/interactor/ForkVersion.kt`。
 
-## GitHub Actions
+### GitHub Actions
 
 | 工作流 | 触发 | 作用 |
 |---|---|---|
@@ -52,7 +62,7 @@ N 对每个上游版本从 1 开始，每次发布加 1，所以 versionCode 一
 
 Firebase / 遥测保持关闭（CI 传 `-Pinclude-telemetry=false`，仓库里没有 `google-services.json`）。
 
-## OneDrive 登录（MSAL）
+### OneDrive 登录（MSAL）
 
 Azure 应用注册（client id `77f7046c-0a22-44b8-aa16-8b8416628c6c`）→ Authentication → Android 平台里，
 每种安装包都要登记各自的重定向 URI：`msauth://<包名>/<URL 编码的签名哈希>`。
@@ -68,7 +78,7 @@ Azure 门户添加 Android 平台时填“包名”和“签名哈希”（未�
 `AndroidManifest.xml` 里的 `BrowserTabActivity` 用 `${applicationId}` 作为 host、接受任意 path，
 所以换签名或换包名不需要改代码，只需要在 Azure 里登记。未登录时，书架同步设置页底部会显示本安装包的重定向 URI。
 
-## 合并上游时的注意事项
+### 合并上游时的注意事项
 
 定制代码尽量放在独立文件里；必须改上游文件的地方都尽量集中在一处，并标了 `Fork` 注释：
 
@@ -94,8 +104,44 @@ git merge --no-ff v0.21.2
 git rm -r -q -f --cached --ignore-unmatch -- .github/workflows && rm -rf .github/workflows && git checkout HEAD -- .github/workflows
 ```
 
-## 本地构建
+### 本地构建
 
 为了不让 OneDrive 的占位文件和同步锁弄坏 Gradle 增量编译，本地构建输出放在 `~/.gradle/project-builds/mihon`
 （`settings.gradle.kts` 和 `gradle/build-logic/build.gradle.kts` 末尾）。CI（有 `CI` 环境变量）上自动关闭，
 也可以用 `-Ptiger.localBuildDir=false` 关闭。
+
+## English
+
+Personal fork of [mihonapp/mihon](https://github.com/mihonapp/mihon). The `custom` branch adds:
+
+- **OneDrive sync** (Settings → Data and storage → library sync; sync button in the library toolbar). One sync covers:
+  - library additions and removals;
+  - global search history (labelled with the device it came from);
+  - "read before" marks;
+  - a settings backup per device (restore any device's backup from "Restore settings from OneDrive"; library, history and logins are not included).
+- **Global search history** in two columns; long queries wrap.
+- **"Read before" mark**: a button on the manga details page, independent of the library (kept after removing from the library). Shown as an eye badge on covers in Browse and global search. E-Hentai galleries match by gallery ID, so E-Hentai and ExHentai share marks.
+
+`main` mirrors upstream and is not developed on.
+
+### Download
+
+<https://github.com/tiger-git2022/mihon/releases/latest>. Release builds use package `app.mihon.tiger` and the name "Mihon Tiger", so they install beside the official Mihon (`app.mihon`). The app checks this repository for updates on launch; you can also check from the About page.
+
+### Versions
+
+Tag / versionName `v<upstream versionName>-t<N>` (for example `v0.21.2-t3`); versionCode `<upstream versionCode> × 1000 + N`. N starts at 1 for each upstream version and increases with every release.
+
+### GitHub Actions
+
+- `tiger-ci.yml`: unit tests, release build (debug signing) and format check for pull requests into `custom`.
+- `tiger-release.yml`: builds signed APKs and publishes a release on every push to `custom`; each commit is released once (a manual run can force it). Release notes are Chinese first, then English.
+- `tiger-sync-upstream.yml`: every 6 hours merges the latest upstream release tag into `custom`; pushes and releases when it merges cleanly and builds, otherwise opens an issue.
+
+Secrets: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` (release signing), and optionally `SYNC_TOKEN` (fine-grained PAT with Contents and Workflows write access, needed when upstream commits touch workflow files).
+
+### OneDrive sign-in (MSAL)
+
+Each package needs its redirect URI `msauth://<package>/<URL-encoded signature hash>` registered under the Android platform of the Azure app registration (client id `77f7046c-0a22-44b8-aa16-8b8416628c6c`). The release signature hash is in every release's "签名信息 / Signing info" section. The app builds the redirect URI at runtime from its actual package and signing certificate, so changing either only needs a new registration in Azure.
+
+See the Chinese section above for the list of upstream files touched by the fork and the manual merge steps.
