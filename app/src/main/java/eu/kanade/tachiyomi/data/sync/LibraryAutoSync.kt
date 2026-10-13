@@ -33,6 +33,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
@@ -146,6 +147,11 @@ class LibraryAutoSync(
             preferences.autoSyncWifiOnly.changes(),
         )
             .onEach { updateWork() }
+            .launchIn(scope)
+        // Queued catch-ups keep the network constraint they were queued with
+        preferences.autoSyncWifiOnly.changes()
+            .drop(1)
+            .onEach { if (isAllowed && isCatchUpPending()) requeueCatchUpWork() }
             .launchIn(scope)
         observeLibrary()
         service.finished
@@ -394,18 +400,26 @@ class LibraryAutoSync(
         val request = synchronized(lock) {
             (preferences.catchUpRequested.get() + 1).also(preferences.catchUpRequested::set)
         }
-        val workRequest = OneTimeWorkRequestBuilder<LibrarySyncWorker>()
-            .setConstraints(constraints())
-            .setInputData(
-                workDataOf(LibrarySyncWorker.KEY_CATCH_UP to true, LibrarySyncWorker.KEY_FROM_CHANGE to fromChange),
-            )
-            .addTag(CATCH_UP_WORK_NAME)
-            .build()
         // Independent of other catch-ups, which may have started their sync before this change or may fail; those
         // that find their requests synced by another sync end right away
-        WorkManager.getInstance(context).enqueue(workRequest)
+        WorkManager.getInstance(context).enqueue(catchUpWorkRequest(fromChange))
         return request
     }
+
+    /** Replaces the queued catch-ups by one with the current network constraint. */
+    private fun requeueCatchUpWork() {
+        val workManager = WorkManager.getInstance(context)
+        workManager.cancelAllWorkByTag(CATCH_UP_WORK_NAME)
+        workManager.enqueue(catchUpWorkRequest(fromChange = false))
+    }
+
+    private fun catchUpWorkRequest(fromChange: Boolean) = OneTimeWorkRequestBuilder<LibrarySyncWorker>()
+        .setConstraints(constraints())
+        .setInputData(
+            workDataOf(LibrarySyncWorker.KEY_CATCH_UP to true, LibrarySyncWorker.KEY_FROM_CHANGE to fromChange),
+        )
+        .addTag(CATCH_UP_WORK_NAME)
+        .build()
 
     internal enum class WorkOutcome { SUCCESS, RETRY, FAILURE }
 
