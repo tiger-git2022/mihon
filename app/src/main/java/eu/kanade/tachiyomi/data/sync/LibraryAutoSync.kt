@@ -77,6 +77,13 @@ class LibraryAutoSync(
     /** A change arrived while a sync ran; it is synced after it. */
     private var pendingAfterSync = false
 
+    /** Foreground syncs running now, and whether all of them sync changes. */
+    private var foregroundSyncs = 0
+    private var foregroundSyncsFromChange = false
+
+    /** Catch-up request made for the running foreground sync when the app went to the background, 0 without one. */
+    private var handoffRequest = 0L
+
     @Volatile
     private var inForeground = false
 
@@ -160,15 +167,23 @@ class LibraryAutoSync(
     fun onAppBackground() {
         if (!isMainProcess) return
         inForeground = false
-        val pending = synchronized(lock) {
+        synchronized(lock) {
             val pending = debounceJob != null || pendingAfterSync
             debounceJob?.cancel()
             debounceJob = null
             batchStartedAt = 0L
             pendingAfterSync = false
-            pending
+            if (pending && isChangeSyncAllowed) {
+                enqueueCatchUpWork(fromChange = true)
+                return
+            }
+            // The process may be killed before the running sync ends; the request is withdrawn if it ends well
+            if (foregroundSyncs == 0 || handoffRequest != 0L) return
+            val fromChange = foregroundSyncsFromChange
+            if (if (fromChange) isChangeSyncAllowed else isAllowed) {
+                handoffRequest = enqueueCatchUpWork(fromChange)
+            }
         }
-        if (pending && isChangeSyncAllowed) enqueueCatchUpWork(fromChange = true)
     }
 
     /** Called by the screens where the user changes synced data. */
@@ -206,10 +221,16 @@ class LibraryAutoSync(
             enqueueCatchUpWork(fromChange)
             return
         }
+        synchronized(lock) {
+            foregroundSyncsFromChange = fromChange && (foregroundSyncs == 0 || foregroundSyncsFromChange)
+            foregroundSyncs++
+        }
+        var synced = false
         try {
             val result = service.sync()
+            synced = result.warning == null
             // A failed search history, marks or settings step: WorkManager retries with backoff
-            if (result.warning != null) enqueueCatchUpWork(fromChange)
+            if (!synced) enqueueCatchUpWork(fromChange)
         } catch (e: CancellationException) {
             throw e
         } catch (e: OneDriveSyncAuthException) {
@@ -218,6 +239,13 @@ class LibraryAutoSync(
             logcat(LogPriority.ERROR, e)
             // WorkManager retries with backoff
             enqueueCatchUpWork(fromChange)
+        } finally {
+            val handoff = synchronized(lock) {
+                foregroundSyncs--
+                if (foregroundSyncs == 0) handoffRequest.also { handoffRequest = 0L } else 0L
+            }
+            // The queued catch-up of changes then finds nothing to sync, unless a later change asked for one
+            if (synced) clearCatchUpRequest(handoff)
         }
     }
 
@@ -347,18 +375,19 @@ class LibraryAutoSync(
      * Syncs once the network allows it, also after the app went to the background. [fromChange] tells a sync of
      * changes, which is skipped if "sync after changes" is turned off meanwhile, from a retry of a failed sync.
      */
-    private fun enqueueCatchUpWork(fromChange: Boolean) {
-        synchronized(lock) {
-            preferences.catchUpRequest.set(preferences.catchUpRequest.get() + 1)
+    private fun enqueueCatchUpWork(fromChange: Boolean): Long {
+        val request = synchronized(lock) {
+            (preferences.catchUpRequest.get() + 1).also(preferences.catchUpRequest::set)
         }
-        val request = OneTimeWorkRequestBuilder<LibrarySyncWorker>()
+        val workRequest = OneTimeWorkRequestBuilder<LibrarySyncWorker>()
             .setConstraints(constraints())
             .setInputData(workDataOf(LibrarySyncWorker.KEY_FROM_CHANGE to fromChange))
             .addTag(CATCH_UP_WORK_NAME)
             .build()
         // Appended behind a running catch-up, which may have started its sync before this change
         WorkManager.getInstance(context)
-            .enqueueUniqueWork(CATCH_UP_WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+            .enqueueUniqueWork(CATCH_UP_WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, workRequest)
+        return request
     }
 
     internal enum class WorkOutcome { SUCCESS, RETRY, FAILURE }
