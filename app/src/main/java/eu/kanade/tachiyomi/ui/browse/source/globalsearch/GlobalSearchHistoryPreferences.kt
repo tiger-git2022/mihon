@@ -46,6 +46,20 @@ class GlobalSearchHistoryPreferences(
         0L,
     )
 
+    private val lock = Any()
+
+    /**
+     * Updates [entries] and [clearedAt] together; every change to the history goes through here so
+     * a sync finishing at the same time cannot undo a search or a clear.
+     */
+    fun update(transform: (entries: List<SearchHistoryEntry>, clearedAt: Long) -> SearchHistoryState) {
+        synchronized(lock) {
+            val updated = transform(entries.get(), clearedAt.get())
+            clearedAt.set(updated.clearedAt)
+            entries.set(updated.entries)
+        }
+    }
+
     // Plain list of queries, newest first, used before entries had timestamps and devices.
     private val legacyHistories: List<Preference<List<String>>> = listOf(
         "global_search_history",
@@ -78,3 +92,8 @@ class GlobalSearchHistoryPreferences(
         val json = Json { ignoreUnknownKeys = true }
     }
 }
+
+data class SearchHistoryState(
+    val entries: List<SearchHistoryEntry>,
+    val clearedAt: Long,
+)

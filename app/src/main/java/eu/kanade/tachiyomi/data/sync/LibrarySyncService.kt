@@ -5,6 +5,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.GlobalSearchHistoryPreferences
+import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SearchHistoryState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -97,11 +98,10 @@ class LibrarySyncService(
             etag = remoteDocument.etag,
         )
         // Keeps searches (or a clear) made while syncing; they go up with the next sync
-        val localClearedAt = maxOf(searchHistoryPreferences.clearedAt.get(), clearedAt)
-        searchHistoryPreferences.clearedAt.set(localClearedAt)
-        searchHistoryPreferences.entries.set(
-            SearchHistoryMerger.merge(searchHistoryPreferences.entries.get(), merged, now, localClearedAt),
-        )
+        searchHistoryPreferences.update { entries, localClearedAt ->
+            val newClearedAt = maxOf(localClearedAt, clearedAt)
+            SearchHistoryState(SearchHistoryMerger.merge(entries, merged, now, newClearedAt), newClearedAt)
+        }
     }
 
     private suspend fun syncMarks() {

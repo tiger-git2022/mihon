@@ -101,19 +101,18 @@ class GlobalSearchViewModel(
     }
 
     fun clearSearchHistory() {
-        searchHistoryPreferences.clearedAt.set(Clock.System.now().toEpochMilliseconds())
-        searchHistoryPreferences.entries.set(emptyList())
+        val now = Clock.System.now().toEpochMilliseconds()
+        searchHistoryPreferences.update { _, clearedAt -> SearchHistoryState(emptyList(), maxOf(clearedAt, now)) }
     }
 
     private fun updateSearchHistory(
         transform: (List<SearchHistoryEntry>, SyncDevice, Long) -> List<SearchHistoryEntry>,
     ) {
         val now = Clock.System.now().toEpochMilliseconds()
-        val entries = SearchHistoryMerger.prune(
-            transform(searchHistoryPreferences.entries.get(), librarySyncPreferences.currentDevice(), now),
-            now,
-        )
-        searchHistoryPreferences.entries.set(entries)
+        val device = librarySyncPreferences.currentDevice()
+        searchHistoryPreferences.update { entries, clearedAt ->
+            SearchHistoryState(SearchHistoryMerger.prune(transform(entries, device, now), now), clearedAt)
+        }
     }
     // endregion
 }
