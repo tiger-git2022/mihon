@@ -56,6 +56,10 @@ class SettingsBackupSync(
 
     /** Downloads [backup] and starts restoring it like a regular backup restore. */
     suspend fun restore(backup: SettingsBackup) {
+        // A second restore request would be dropped while one is running
+        if (BackupRestoreWorker.isRunning(context.workManager)) {
+            throw OneDriveSyncException("A restore is already in progress")
+        }
         val bytes = oneDriveSyncClient.readBytes(backup.fileName)
             ?: throw OneDriveSyncException("The settings backup no longer exists on OneDrive")
         val file = withContext(Dispatchers.IO) {

@@ -37,6 +37,15 @@ class GlobalSearchHistoryPreferences(
         },
     )
 
+    /**
+     * When the history was last cleared, here or on another device. Clearing drops every entry
+     * searched before, including ones from other devices this device has not seen yet.
+     */
+    val clearedAt: Preference<Long> = preferenceStore.getLong(
+        Preference.appStateKey("global_search_history_cleared_at"),
+        0L,
+    )
+
     // Plain list of queries, newest first, used before entries had timestamps and devices.
     private val legacyHistories: List<Preference<List<String>>> = listOf(
         "global_search_history",

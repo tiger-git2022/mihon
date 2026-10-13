@@ -65,7 +65,7 @@ class LibrarySyncService(
             runStep { syncMarks() },
             runStep { settingsBackupSync.upload(device) },
         )
-        result.copy(warning = warnings.firstOrNull())
+        result.copy(warning = warnings.takeIf { it.isNotEmpty() }?.joinToString("; "))
     }
 
     suspend fun listSettingsBackups(): List<SettingsBackup> = settingsBackupSync.list()
@@ -89,15 +89,19 @@ class LibrarySyncService(
             // Entries from before search history was synced have no device yet
             if (entry.deviceId.isBlank()) entry.copy(deviceId = device.id, deviceName = device.name) else entry
         }
-        val merged = SearchHistoryMerger.merge(local, cloud.entries, now)
+        val clearedAt = maxOf(searchHistoryPreferences.clearedAt.get(), cloud.clearedAt)
+        val merged = SearchHistoryMerger.merge(local, cloud.entries, now, clearedAt)
         oneDriveSyncClient.writeDocument(
             fileName = SearchHistorySyncFile.FILE_NAME,
-            contents = json.encodeToString(SearchHistorySyncFile(entries = merged)),
+            contents = json.encodeToString(SearchHistorySyncFile(entries = merged, clearedAt = clearedAt)),
             etag = remoteDocument.etag,
         )
-        // Keeps searches made while syncing; they go up with the next sync
-        val current = searchHistoryPreferences.entries.get()
-        searchHistoryPreferences.entries.set(SearchHistoryMerger.merge(current, merged, now))
+        // Keeps searches (or a clear) made while syncing; they go up with the next sync
+        val localClearedAt = maxOf(searchHistoryPreferences.clearedAt.get(), clearedAt)
+        searchHistoryPreferences.clearedAt.set(localClearedAt)
+        searchHistoryPreferences.entries.set(
+            SearchHistoryMerger.merge(searchHistoryPreferences.entries.get(), merged, now, localClearedAt),
+        )
     }
 
     private suspend fun syncMarks() {

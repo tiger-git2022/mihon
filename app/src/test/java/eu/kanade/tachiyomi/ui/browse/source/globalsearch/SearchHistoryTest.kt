@@ -57,16 +57,6 @@ class SearchHistoryTest {
     }
 
     @Test
-    fun `clearing marks every query as deleted`() {
-        val history = listOf(entry("One Piece", 2), entry("Berserk", 1))
-
-        val result = history.withoutAnySearchQuery(phone, now = 5)
-
-        assertEquals(listOf(true, true), result.map { it.deleted })
-        assertEquals(emptyList<SearchHistoryItem>(), result.toSearchHistoryItems(phone))
-    }
-
-    @Test
     fun `items name the device only for queries from other devices`() {
         val history = listOf(
             entry("One Piece", 1),

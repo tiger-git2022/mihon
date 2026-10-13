@@ -101,7 +101,8 @@ class GlobalSearchViewModel(
     }
 
     fun clearSearchHistory() {
-        updateSearchHistory { entries, device, now -> entries.withoutAnySearchQuery(device, now) }
+        searchHistoryPreferences.clearedAt.set(Clock.System.now().toEpochMilliseconds())
+        searchHistoryPreferences.entries.set(emptyList())
     }
 
     private fun updateSearchHistory(

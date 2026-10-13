@@ -46,13 +46,6 @@ internal fun List<SearchHistoryEntry>.withoutSearchQuery(
     }
 }
 
-internal fun List<SearchHistoryEntry>.withoutAnySearchQuery(
-    device: SyncDevice,
-    now: Long,
-): List<SearchHistoryEntry> {
-    return map { entry -> if (entry.deleted) entry else entry.asDeleted(device, now) }
-}
-
 internal fun List<SearchHistoryEntry>.toSearchHistoryItems(device: SyncDevice): List<SearchHistoryItem> {
     return filterNot(SearchHistoryEntry::deleted)
         .sortedByDescending(SearchHistoryEntry::updatedAt)

@@ -26,6 +26,16 @@ class MultiDeviceSyncTest {
     }
 
     @Test
+    fun `clearing drops older entries from every device`() {
+        val local = listOf(search("Berserk", updatedAt = 10))
+        val cloud = listOf(search("Monster", updatedAt = 20, device = "tablet"), search("Vagabond", updatedAt = 40))
+
+        val merged = SearchHistoryMerger.merge(local, cloud, now = 50, clearedAt = 30)
+
+        assertEquals(listOf("Vagabond"), merged.map { it.query })
+    }
+
+    @Test
     fun `search history keeps a limited number of queries and drops old deletion markers`() {
         val now = SearchHistoryMerger.DELETION_RETENTION_MILLIS * 2
         val live = (1..SearchHistoryMerger.MAX_ENTRIES + 10).map { search("Query $it", updatedAt = now - it) }

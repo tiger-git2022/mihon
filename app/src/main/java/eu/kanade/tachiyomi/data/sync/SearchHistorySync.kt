@@ -27,6 +27,8 @@ data class SearchHistorySyncFile(
     @EncodeDefault
     val version: Int = CURRENT_VERSION,
     val entries: List<SearchHistoryEntry> = emptyList(),
+    /** When the history was last cleared; older entries are dropped on every device. */
+    val clearedAt: Long = 0L,
 ) {
     companion object {
         const val CURRENT_VERSION = 1
@@ -46,9 +48,11 @@ internal object SearchHistoryMerger {
         local: List<SearchHistoryEntry>,
         cloud: List<SearchHistoryEntry>,
         now: Long,
+        clearedAt: Long = 0L,
     ): List<SearchHistoryEntry> {
         return prune(
-            LatestWinsMerger.merge(local, cloud, SearchHistoryEntry::key, SearchHistoryEntry::updatedAt),
+            LatestWinsMerger.merge(local, cloud, SearchHistoryEntry::key, SearchHistoryEntry::updatedAt)
+                .filter { it.updatedAt > clearedAt },
             now,
         )
     }
