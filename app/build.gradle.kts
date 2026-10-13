@@ -478,8 +478,10 @@ if (tigerBuildNumber != null) {
     androidComponents {
         onVariants(selector().withBuildType("release")) { variant ->
             variant.outputs.forEach { output ->
-                output.versionName.set(output.versionName.map { "$it-t$tigerBuildNumber" })
-                output.versionCode.set(output.versionCode.map { (it ?: 0) * 1000 + tigerBuildNumber })
+                val upstreamVersionName = output.versionName.get()
+                val upstreamVersionCode = output.versionCode.get() ?: 0
+                output.versionName.set("$upstreamVersionName-t$tigerBuildNumber")
+                output.versionCode.set(upstreamVersionCode * 1000 + tigerBuildNumber)
             }
         }
     }
