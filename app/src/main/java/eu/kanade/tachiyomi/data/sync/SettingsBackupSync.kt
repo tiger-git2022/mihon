@@ -59,7 +59,12 @@ class SettingsBackupSync(
         val bytes = oneDriveSyncClient.readBytes(backup.fileName)
             ?: throw OneDriveSyncException("The settings backup no longer exists on OneDrive")
         val file = withContext(Dispatchers.IO) {
-            File(context.cacheDir, "tiger-settings-restore.tachibk").apply { writeBytes(bytes) }
+            // A file per restore: a restore still waiting to start must not read another one's file
+            val now = System.currentTimeMillis()
+            context.cacheDir.listFiles { file -> file.name.startsWith(RESTORE_FILE_PREFIX) }
+                ?.filter { now - it.lastModified() > STALE_RESTORE_FILE_MILLIS }
+                ?.forEach { it.delete() }
+            File(context.cacheDir, "$RESTORE_FILE_PREFIX$now.tachibk").apply { writeBytes(bytes) }
         }
         BackupRestoreWorker.start(context.workManager, Uri.fromFile(file), RESTORE_OPTIONS)
     }
@@ -87,6 +92,8 @@ class SettingsBackupSync(
 
     private companion object {
         const val FILE_PREFIX = "mihon-settings-"
+        const val RESTORE_FILE_PREFIX = "tiger-settings-restore-"
+        const val STALE_RESTORE_FILE_MILLIS = 24L * 60 * 60 * 1000
         val FILE_REGEX = Regex("""mihon-settings-(.*)-([0-9a-z]{8})\.tachibk""")
 
         val BACKUP_OPTIONS = BackupOptions(

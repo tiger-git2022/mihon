@@ -95,7 +95,9 @@ class LibrarySyncService(
             contents = json.encodeToString(SearchHistorySyncFile(entries = merged)),
             etag = remoteDocument.etag,
         )
-        searchHistoryPreferences.entries.set(merged)
+        // Keeps searches made while syncing; they go up with the next sync
+        val current = searchHistoryPreferences.entries.get()
+        searchHistoryPreferences.entries.set(SearchHistoryMerger.merge(current, merged, now))
     }
 
     private suspend fun syncMarks() {

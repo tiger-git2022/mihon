@@ -189,7 +189,7 @@ class OneDriveSyncClient(
     suspend fun deleteFile(fileName: String) {
         val accessToken = acquireAccessToken()
         val request = Request.Builder()
-            .url(fileUrl(fileName).removeSuffix(":/content") + ":")
+            .url(fileUrl(fileName).removeSuffix(":/content"))
             .header("Authorization", "Bearer $accessToken")
             .delete()
             .build()
