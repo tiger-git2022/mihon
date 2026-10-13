@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -21,9 +23,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.tachiyomi.data.sync.SettingsBackup
 import eu.kanade.tachiyomi.ui.library.librarySyncMessage
+import eu.kanade.tachiyomi.ui.library.librarySyncProgressText
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -54,6 +59,8 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
     val accountName by preferences.accountName.collectAsState()
     val activity = remember(context) { context.findActivity() }
     var isBusy by remember { mutableStateOf(false) }
+    // Also shows a sync started from the library toolbar
+    val syncProgress by service.progress.collectAsStateWithLifecycle()
 
     LaunchedEffect(service) {
         runCatching { service.refreshAccount() }
@@ -130,24 +137,33 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
             } else {
                 add(
                     Preference.PreferenceItem.TextPreference(
-                        title = if (isBusy) {
-                            stringResource(MR.strings.library_sync_syncing)
-                        } else {
-                            stringResource(MR.strings.library_sync_now)
+                        title = when {
+                            syncProgress != null -> librarySyncProgressText(syncProgress!!)
+                            isBusy -> stringResource(MR.strings.library_sync_syncing)
+                            else -> stringResource(MR.strings.library_sync_now)
                         },
-                        onClick = action {
-                            runCatching {
-                                withContext(Dispatchers.IO) { service.sync() }
-                            }.onSuccess { result ->
-                                context.toast(context.librarySyncMessage(result))
-                            }.onFailure { error ->
-                                logcat(LogPriority.ERROR, error)
-                                context.toast(
-                                    context.stringResource(
-                                        MR.strings.library_sync_failed,
-                                        error.message.orEmpty(),
-                                    ),
-                                )
+                        widget = if (syncProgress != null) {
+                            { LibrarySyncProgressIndicator(syncProgress?.percent) }
+                        } else {
+                            null
+                        },
+                        onClick = if (syncProgress != null) {
+                            null
+                        } else {
+                            action {
+                                runCatching {
+                                    withContext(Dispatchers.IO) { service.sync() }
+                                }.onSuccess { result ->
+                                    context.toast(context.librarySyncMessage(result))
+                                }.onFailure { error ->
+                                    logcat(LogPriority.ERROR, error)
+                                    context.toast(
+                                        context.stringResource(
+                                            MR.strings.library_sync_failed,
+                                            error.message.orEmpty(),
+                                        ),
+                                    )
+                                }
                             }
                         },
                     ),
@@ -279,4 +295,16 @@ private fun SettingsRestoreDialog(
 private fun Long.toDateTimeString(): String {
     if (this <= 0L) return "-"
     return DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(this))
+}
+
+@Composable
+private fun LibrarySyncProgressIndicator(percent: Int?) {
+    val modifier = Modifier
+        .padding(start = 16.dp)
+        .size(24.dp)
+    if (percent != null) {
+        CircularProgressIndicator(progress = { percent / 100f }, modifier = modifier, strokeWidth = 3.dp)
+    } else {
+        CircularProgressIndicator(modifier = modifier, strokeWidth = 3.dp)
+    }
 }

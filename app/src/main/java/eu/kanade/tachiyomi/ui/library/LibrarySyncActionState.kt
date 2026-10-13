@@ -11,9 +11,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import eu.kanade.tachiyomi.data.sync.LibrarySyncProgress
 import eu.kanade.tachiyomi.data.sync.LibrarySyncResult
+import eu.kanade.tachiyomi.data.sync.SettingsBackupStage
 import eu.kanade.tachiyomi.ui.setting.SettingsScreen
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +25,7 @@ import kotlinx.coroutines.withContext
 import mihon.app.di.appGraph
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.i18n.MR
+import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.collectAsState
 
 /**
@@ -34,6 +38,8 @@ import tachiyomi.presentation.core.util.collectAsState
 class LibrarySyncActionState(
     val isSyncing: Boolean,
     val onClick: () -> Unit,
+    /** Current sync step and progress, e.g. "Syncing (1/4): Library 37/120 (30%)". */
+    val progressText: String?,
 )
 
 @Composable
@@ -46,6 +52,8 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
     val librarySyncService = remember { context.appGraph.librarySyncService }
     val accountName by librarySyncPreferences.accountName.collectAsState()
     var isSyncing by remember { mutableStateOf(false) }
+    val progress by librarySyncService.progress.collectAsStateWithLifecycle()
+    val progressText = progress?.let { librarySyncProgressText(it) }
 
     LaunchedEffect(librarySyncService) {
         runCatching { librarySyncService.refreshAccount() }
@@ -53,13 +61,14 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
     }
 
     return LibrarySyncActionState(
-        isSyncing = isSyncing,
+        isSyncing = isSyncing || progress != null,
+        progressText = progressText,
         onClick = onClick@{
             if (accountName.isBlank()) {
                 navigator.push(SettingsScreen(SettingsScreen.Destination.DataAndStorage))
                 return@onClick
             }
-            if (isSyncing) return@onClick
+            if (isSyncing || progress != null) return@onClick
 
             isSyncing = true
             scope.launch {
@@ -85,4 +94,26 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
 internal fun Context.librarySyncMessage(result: LibrarySyncResult): String {
     val message = stringResource(MR.strings.library_sync_success, result.added, result.removed, result.total)
     return result.warning?.let { stringResource(MR.strings.library_sync_partial_failure, message, it) } ?: message
+}
+
+@Composable
+internal fun librarySyncProgressText(progress: LibrarySyncProgress): String {
+    val stepName = when (progress.step) {
+        LibrarySyncProgress.Step.LIBRARY -> stringResource(MR.strings.library_sync_step_library)
+        LibrarySyncProgress.Step.SEARCH_HISTORY -> stringResource(MR.strings.library_sync_step_search_history)
+        LibrarySyncProgress.Step.MARKS -> stringResource(MR.strings.library_sync_step_marks)
+        LibrarySyncProgress.Step.SETTINGS_BACKUP -> when (progress.stage) {
+            SettingsBackupStage.UPLOAD -> stringResource(MR.strings.library_sync_step_settings_upload)
+            else -> stringResource(MR.strings.library_sync_step_settings_create)
+        }
+    }
+    val detail = progress.percent
+        ?.let { stringResource(MR.strings.library_sync_progress_count, stepName, progress.done, progress.total, it) }
+        ?: stepName
+    return stringResource(
+        MR.strings.library_sync_progress,
+        progress.step.number,
+        LibrarySyncProgress.STEP_COUNT,
+        detail,
+    )
 }

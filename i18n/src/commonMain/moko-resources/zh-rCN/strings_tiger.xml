@@ -28,4 +28,11 @@
     <string name="library_sync_restore_started">正在恢复设置…</string>
     <string name="manga_mark_as_read">标记看过</string>
     <string name="manga_mark_read">看过</string>
+    <string name="library_sync_progress">正在同步（%1$d/%2$d）：%3$s</string>
+    <string name="library_sync_progress_count">%1$s %2$d/%3$d（%4$d%%）</string>
+    <string name="library_sync_step_library">书架</string>
+    <string name="library_sync_step_search_history">搜索记录</string>
+    <string name="library_sync_step_marks">看过标记</string>
+    <string name="library_sync_step_settings_create">生成设置备份</string>
+    <string name="library_sync_step_settings_upload">上传设置备份</string>
 </resources>
