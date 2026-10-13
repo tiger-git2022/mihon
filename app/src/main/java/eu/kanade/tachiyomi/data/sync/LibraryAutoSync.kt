@@ -153,6 +153,13 @@ class LibraryAutoSync(
             .drop(1)
             .onEach { if (isAllowed && isCatchUpPending()) requeueCatchUpWork() }
             .launchIn(scope)
+        // Signing in or switching accounts syncs right away: the launch sync may have passed while signed out, and
+        // the periodic sync only starts after a full interval
+        preferences.accountId.changes()
+            .distinctUntilChanged()
+            .drop(1)
+            .onEach { accountId -> if (accountId.isNotBlank() && isAllowed) syncNowOrLater(fromChange = false) }
+            .launchIn(scope)
         observeLibrary()
         service.finished
             .onEach { onSyncFinished() }
