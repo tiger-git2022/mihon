@@ -422,7 +422,8 @@ data class LibrarySyncProgress(
     }
 
     val percent: Int?
-        get() = if (total > 0) (done * 100 / total).coerceIn(0, 100) else null
+        // In Long: bytes of a download over 20 MB times 100 overflow an Int
+        get() = if (total > 0) (done.toLong() * 100 / total).coerceIn(0, 100).toInt() else null
 
     /** Progress of the whole sync from 0 to 1: the steps done, plus the part of the current step that is known. */
     val fraction: Float
