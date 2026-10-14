@@ -104,14 +104,8 @@ class GlobalSearchViewModel(
     // The other spelling of an artist, circle or title the EhViewer favorites list both ways, else the romanized
     // kana of a name nobody favorited
     override fun alternativeQuery(query: String): String? {
-        val alias = if (librarySyncPreferences.showEhViewerFavorites.get()) {
-            ehFavoritesStore.index.value.aliases.alternative(
-                query,
-            )
-        } else {
-            null
-        }
-        return alias ?: KanaRomaji.romanize(query)
+        val aliases = ehFavoritesStore.index.value.aliases.takeIf { librarySyncPreferences.showEhViewerFavorites.get() }
+        return aliases?.alternative(query) ?: KanaRomaji.romanize(query)
     }
 
     fun removeSearchHistory(query: String) {
