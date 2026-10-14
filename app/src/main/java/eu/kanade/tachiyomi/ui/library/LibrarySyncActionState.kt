@@ -170,7 +170,7 @@ internal fun Context.librarySyncMessage(result: LibrarySyncResult): String {
 
 @Composable
 internal fun librarySyncProgressText(progress: LibrarySyncProgress): String {
-    val stepName = when (progress.step) {
+    val baseName = when (progress.step) {
         LibrarySyncProgress.Step.LIBRARY -> stringResource(MR.strings.library_sync_step_library)
         LibrarySyncProgress.Step.SEARCH_HISTORY -> stringResource(MR.strings.library_sync_step_search_history)
         LibrarySyncProgress.Step.MARKS -> stringResource(MR.strings.library_sync_step_marks)
@@ -184,6 +184,14 @@ internal fun librarySyncProgressText(progress: LibrarySyncProgress): String {
             else -> stringResource(MR.strings.library_sync_step_settings_create)
         }
     }
+    // "Library · comparing"
+    val stepName = when (progress.phase) {
+        LibrarySyncProgress.Phase.DOWNLOAD -> stringResource(MR.strings.library_sync_phase_download)
+        LibrarySyncProgress.Phase.COMPARE -> stringResource(MR.strings.library_sync_phase_compare)
+        LibrarySyncProgress.Phase.UPLOAD -> stringResource(MR.strings.library_sync_phase_upload)
+        LibrarySyncProgress.Phase.APPLY -> stringResource(MR.strings.library_sync_phase_apply)
+        null -> null
+    }?.let { stringResource(MR.strings.library_sync_step_phase, baseName, it) } ?: baseName
     val detail = when {
         // Bytes as megabytes: "Downloading EhViewer favorites 1.2/3.4 MB (35%)"
         progress.favoritesStage == EhFavoritesSyncStage.DOWNLOAD ->

@@ -20,6 +20,7 @@ import eu.kanade.tachiyomi.data.backup.create.BackupCreateWorker
 import eu.kanade.tachiyomi.data.backup.restore.BackupRestoreWorker
 import eu.kanade.tachiyomi.data.cache.ChapterCache
 import eu.kanade.tachiyomi.data.cache.CoverCache
+import eu.kanade.tachiyomi.data.download.ChapterDownloadSizes
 import eu.kanade.tachiyomi.data.download.DownloadCache
 import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.download.DownloadWorker
@@ -107,6 +108,9 @@ interface AppGraph : ViewModelGraph {
     val libraryAutoSync: LibraryAutoSync
     val mangaMarkStore: MangaMarkStore
     val ehFavoritesStore: EhFavoritesStore
+
+    // Fork: sizes of downloaded chapters
+    val chapterDownloadSizes: ChapterDownloadSizes
 
     val updateChecker: AppUpdateChecker
 

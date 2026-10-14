@@ -60,6 +60,7 @@ import eu.kanade.presentation.manga.components.ReadMarkActionButton
 import eu.kanade.presentation.manga.components.rememberEhViewerSearchActions
 import eu.kanade.presentation.util.formatChapterNumber
 import eu.kanade.tachiyomi.data.download.model.Download
+import eu.kanade.tachiyomi.data.download.rememberChapterDownloadSize
 import eu.kanade.tachiyomi.source.getNameForMangaInfo
 import eu.kanade.tachiyomi.ui.manga.ChapterList
 import eu.kanade.tachiyomi.ui.manga.MangaViewModel
@@ -773,6 +774,8 @@ private fun LazyListScope.sharedChapterItems(
                             )
                         },
                     scanlator = item.chapter.scanlator.takeIf { !it.isNullOrBlank() },
+                    // Fork: size of the downloaded chapter
+                    downloadedSize = rememberChapterDownloadSize(manga, item.chapter, item.isDownloaded),
                     read = item.chapter.read,
                     bookmark = item.chapter.bookmark,
                     selected = item.selected,
