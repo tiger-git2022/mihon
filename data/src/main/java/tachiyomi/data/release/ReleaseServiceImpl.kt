@@ -9,6 +9,7 @@ import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.network.parseAs
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -26,11 +27,15 @@ class ReleaseServiceImpl(
 
     override suspend fun latest(arguments: GetApplicationRelease.Arguments): Release? {
         val release = withContext(Dispatchers.IO) {
-            with(json) {
-                networkService.client
-                    .newCall(GET("https://api.github.com/repos/${arguments.repository}/releases/latest"))
-                    .awaitSuccess()
-                    .parseAs<GithubRelease>()
+            // Fork: the release workflow attaches update.json, the API's release object, to every release. It is
+            // served like any release download, while api.github.com allows 60 requests an hour per IP without
+            // login, which shared mobile-network IPs often use up (HTTP 403). Older releases fall back to the API.
+            try {
+                fetchRelease("https://github.com/${arguments.repository}/releases/latest/download/update.json")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                fetchRelease("https://api.github.com/repos/${arguments.repository}/releases/latest")
             }
         }
 
@@ -44,6 +49,13 @@ class ReleaseServiceImpl(
             releaseLink = release.releaseLink,
             downloadLink = downloadLink,
         )
+    }
+
+    private suspend fun fetchRelease(url: String): GithubRelease = with(json) {
+        networkService.client
+            .newCall(GET(url))
+            .awaitSuccess()
+            .parseAs<GithubRelease>()
     }
 
     private fun getDownloadLink(release: GithubRelease, isFoss: Boolean): String? {
