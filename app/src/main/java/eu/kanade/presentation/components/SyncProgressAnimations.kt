@@ -1,5 +1,8 @@
 package eu.kanade.presentation.components
 
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -12,7 +15,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.progressSemantics
 import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -148,9 +153,23 @@ private fun infiniteFraction(
     label = "syncProgressFraction",
 )
 
-/** False with "Remove animations" (animator duration scale 0). */
+/** False with "Remove animations" (animator duration scale 0); follows changes to that setting. */
 @Composable
 private fun animationsEnabled(): Boolean {
     val resolver = LocalContext.current.contentResolver
-    return remember(resolver) { Settings.Global.getFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f }
+    fun read() = Settings.Global.getFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
+    val enabled = remember(resolver) { mutableStateOf(read()) }
+    DisposableEffect(resolver) {
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                enabled.value = read()
+            }
+        }
+        val uri = Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE)
+        resolver.registerContentObserver(uri, false, observer)
+        // The setting may have changed between the first read and registering
+        enabled.value = read()
+        onDispose { resolver.unregisterContentObserver(observer) }
+    }
+    return enabled.value
 }
