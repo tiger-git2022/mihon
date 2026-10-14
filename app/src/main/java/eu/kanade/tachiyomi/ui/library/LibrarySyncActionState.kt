@@ -75,9 +75,6 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
     val progress by librarySyncService.progress.collectAsStateWithLifecycle()
     val progressText = progress?.let { librarySyncProgressText(it) }
     val changesPending by librarySyncService.changesPending.collectAsStateWithLifecycle()
-    // Changes handed to background work that has not synced them yet
-    val catchUpRequested by librarySyncPreferences.catchUpRequested.collectAsState()
-    val catchUpSynced by librarySyncPreferences.catchUpSynced.collectAsState()
     val lastSyncTime by librarySyncPreferences.lastSyncTime.collectAsState()
     val lastSyncFailed by librarySyncPreferences.lastSyncFailed.collectAsState()
 
@@ -89,7 +86,7 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
     val syncing = isSyncing || progress != null
     val state = when {
         syncing -> LibrarySyncState.RUNNING
-        changesPending || catchUpRequested > catchUpSynced -> LibrarySyncState.PENDING
+        changesPending -> LibrarySyncState.PENDING
         lastSyncFailed && lastSyncTime > 0 -> LibrarySyncState.FAILED
         lastSyncTime > 0 -> LibrarySyncState.SUCCEEDED
         else -> LibrarySyncState.NOT_SYNCED

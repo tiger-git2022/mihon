@@ -249,6 +249,10 @@ class LibrarySyncService(
             preferences.baseline.delete()
             // The EhViewer favorites belong to the previous account; the next sync downloads those of the new one
             ehFavoritesStore.clear()
+            // So is the result of the last sync shown by the sync action
+            preferences.lastSyncTime.delete()
+            preferences.lastSyncFailed.delete()
+            _changesPending.value = false
         }
         if (account == null) {
             preferences.accountId.delete()
