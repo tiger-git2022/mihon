@@ -26,6 +26,7 @@ import eu.kanade.tachiyomi.data.download.DownloadWorker
 import eu.kanade.tachiyomi.data.library.LibraryUpdateWorker
 import eu.kanade.tachiyomi.data.library.MetadataUpdateWorker
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
+import eu.kanade.tachiyomi.data.sync.EhFavoritesStore
 import eu.kanade.tachiyomi.data.sync.LibraryAutoSync
 import eu.kanade.tachiyomi.data.sync.LibrarySyncPreferences
 import eu.kanade.tachiyomi.data.sync.LibrarySyncService
@@ -105,6 +106,7 @@ interface AppGraph : ViewModelGraph {
     val librarySyncService: LibrarySyncService
     val libraryAutoSync: LibraryAutoSync
     val mangaMarkStore: MangaMarkStore
+    val ehFavoritesStore: EhFavoritesStore
 
     val updateChecker: AppUpdateChecker
 

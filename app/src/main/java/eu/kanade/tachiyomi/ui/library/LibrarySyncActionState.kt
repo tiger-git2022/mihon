@@ -102,6 +102,7 @@ internal fun librarySyncProgressText(progress: LibrarySyncProgress): String {
         LibrarySyncProgress.Step.LIBRARY -> stringResource(MR.strings.library_sync_step_library)
         LibrarySyncProgress.Step.SEARCH_HISTORY -> stringResource(MR.strings.library_sync_step_search_history)
         LibrarySyncProgress.Step.MARKS -> stringResource(MR.strings.library_sync_step_marks)
+        LibrarySyncProgress.Step.EHVIEWER_FAVORITES -> stringResource(MR.strings.library_sync_step_ehviewer_favorites)
         LibrarySyncProgress.Step.SETTINGS_BACKUP -> when (progress.stage) {
             SettingsBackupStage.UPLOAD -> stringResource(MR.strings.library_sync_step_settings_upload)
             else -> stringResource(MR.strings.library_sync_step_settings_create)

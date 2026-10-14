@@ -57,4 +57,17 @@
     <string name="library_sync_on_change_summary">Syncs 60 s after the last change to the library, search history, read marks or settings, at most 5 min after the first one.</string>
     <string name="library_sync_wifi_only">Only on Wi-Fi</string>
     <string name="library_sync_wifi_only_summary">Automatic syncs wait for an unmetered network. Sync now always works.</string>
+
+    <!-- EhViewer favorites -->
+    <string name="library_sync_step_ehviewer_favorites">EhViewer favorites</string>
+    <string name="library_sync_ehviewer_favorites">Mark EhViewer favorites</string>
+    <string name="library_sync_ehviewer_favorites_summary">Reads the favorites list the EhViewer fork uploads to the same OneDrive account and marks matching manga on covers in Browse and global search and on the details page: \"Local\" or \"Cloud: slot name\". E-Hentai sources match by gallery ID, other sources by title (brackets, tags, traditional/simplified Chinese and censored characters such as ○ are ignored).</string>
+    <string name="ehviewer_favorite_local">Local</string>
+    <string name="ehviewer_favorite_cloud">Cloud: %s</string>
+    <string name="ehviewer_favorite_title">EhViewer favorites</string>
+    <string name="ehviewer_favorite_by_gallery_id">Matched by gallery ID.</string>
+    <string name="ehviewer_favorite_by_title">Matched by title; check that it is the same work.</string>
+    <string name="ehviewer_favorite_local_full">Local favorites</string>
+    <string name="ehviewer_favorite_cloud_full">Cloud favorites: %s</string>
+    <string name="ehviewer_favorite_open">Open in EhViewer</string>
 </resources>

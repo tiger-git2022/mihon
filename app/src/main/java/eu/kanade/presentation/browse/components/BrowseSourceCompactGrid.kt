@@ -74,6 +74,7 @@ private fun BrowseSourceCompactGridItem(
         coverBadgeStart = {
             InLibraryBadge(enabled = manga.favorite)
             MangaMarkBadges(manga.source, manga.url)
+            EhFavoriteBadges(manga)
         },
         onLongClick = onLongClick,
         onClick = onClick,

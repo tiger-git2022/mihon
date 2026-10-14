@@ -35,6 +35,7 @@ class LibrarySyncService(
     private val oneDriveSyncClient: OneDriveSyncClient,
     private val searchHistoryPreferences: GlobalSearchHistoryPreferences,
     private val mangaMarkStore: MangaMarkStore,
+    private val ehFavoritesStore: EhFavoritesStore,
     private val settingsBackupSync: SettingsBackupSync,
 ) {
     private val syncMutex = Mutex()
@@ -66,7 +67,7 @@ class LibrarySyncService(
     }
 
     suspend fun signIn(activity: Activity): OneDriveAccount {
-        return oneDriveSyncClient.signIn(activity).also(::updateAccount)
+        return oneDriveSyncClient.signIn(activity).also { updateAccount(it) }
     }
 
     suspend fun signOut() {
@@ -108,6 +109,7 @@ class LibrarySyncService(
                         _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.SETTINGS_BACKUP, stage = stage)
                     }
                 },
+                runStep(LibrarySyncProgress.Step.EHVIEWER_FAVORITES) { ehFavoritesStore.sync() },
             )
             return result.copy(warning = warnings.takeIf { it.isNotEmpty() }?.joinToString("; "))
         } finally {
@@ -215,11 +217,13 @@ class LibrarySyncService(
         return result.copy(total = merged.entries.count(LibrarySyncEntry::favorite))
     }
 
-    private fun updateAccount(account: OneDriveAccount?) {
+    private suspend fun updateAccount(account: OneDriveAccount?) {
         val previousAccountId = preferences.accountId.get()
         val currentAccountId = account?.id.orEmpty()
         if (previousAccountId != currentAccountId) {
             preferences.baseline.delete()
+            // The EhViewer favorites belong to the previous account; the next sync downloads those of the new one
+            ehFavoritesStore.clear()
         }
         if (account == null) {
             preferences.accountId.delete()
@@ -369,13 +373,14 @@ data class LibrarySyncProgress(
         SEARCH_HISTORY(2),
         MARKS(3),
         SETTINGS_BACKUP(4),
+        EHVIEWER_FAVORITES(5),
     }
 
     val percent: Int?
         get() = if (total > 0) (done * 100 / total).coerceIn(0, 100) else null
 
     companion object {
-        const val STEP_COUNT = 4
+        const val STEP_COUNT = 5
     }
 }
 
