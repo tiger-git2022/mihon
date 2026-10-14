@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 /*
  * Progress of a running OneDrive sync (fork-only feature). At 0 a filled part has no length and nothing moves, so
  * the endless indicator shows until the first step is done: a sync waiting on the network still reads as running.
+ * With progress, the bar shimmers and the ring is redrawn softly, see SyncProgressAnimations.
  */
 
 /** A bar for the progress of a running sync, [fraction] from 0 to 1, endless without it. */
@@ -26,7 +27,8 @@ fun SyncLinearProgressIndicator(fraction: Float?, modifier: Modifier = Modifier)
             ProgressIndicatorDefaults.ProgressAnimationSpec,
             label = "syncProgress",
         )
-        LinearProgressIndicator(progress = { animated }, modifier = modifier)
+        // A light sweeps over the done part, see ShimmerLinearProgress
+        ShimmerLinearProgress(progress = { animated }, modifier = modifier)
     } else {
         LinearProgressIndicator(modifier = modifier)
     }
@@ -47,9 +49,10 @@ fun SyncRingProgressIndicator(
             ProgressIndicatorDefaults.ProgressAnimationSpec,
             label = "syncRing",
         )
-        CircularProgressIndicator(progress = {
+        // The done arc is redrawn faintly now and then, see SoftRedrawRingProgress
+        SoftRedrawRingProgress(progress = {
             animated
-        }, modifier = modifier.size(size), color = color, strokeWidth = strokeWidth)
+        }, color = color, modifier = modifier.size(size), strokeWidth = strokeWidth)
     } else {
         CircularProgressIndicator(modifier = modifier.size(size), color = color, strokeWidth = strokeWidth)
     }

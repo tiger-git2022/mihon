@@ -17,7 +17,7 @@ import eu.kanade.tachiyomi.ui.library.LibrarySyncActionState
 
 /**
  * Progress of a running OneDrive library sync below the library toolbar (fork-only feature): a bar for the whole
- * sync and the current step, e.g. "Syncing 6% (1/5): Library 37/120 (30%)". Its waves move while the sync runs.
+ * sync and the current step, e.g. "Syncing 6% (1/5): Library 37/120 (30%)". A light sweeps over it while the sync runs.
  */
 @Composable
 fun LibrarySyncProgressBar(state: LibrarySyncActionState, modifier: Modifier = Modifier) {
