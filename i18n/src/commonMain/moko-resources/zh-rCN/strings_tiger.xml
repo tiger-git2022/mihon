@@ -64,4 +64,7 @@
     <string name="ehviewer_favorite_local_full">本地收藏</string>
     <string name="ehviewer_favorite_cloud_full">云端收藏：%s</string>
     <string name="ehviewer_favorite_open">在 EhViewer 中打开</string>
+    <string name="ehviewer_search_title">在 EhViewer 中搜索标题</string>
+    <string name="ehviewer_search_artist">在 EhViewer 中搜索「%1$s」</string>
+    <string name="ehviewer_not_installed">没有安装 EhViewer</string>
 </resources>

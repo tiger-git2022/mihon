@@ -74,4 +74,7 @@
     <string name="ehviewer_favorite_local_full">Local favorites</string>
     <string name="ehviewer_favorite_cloud_full">Cloud favorites: %s</string>
     <string name="ehviewer_favorite_open">Open in EhViewer</string>
+    <string name="ehviewer_search_title">Search the title in EhViewer</string>
+    <string name="ehviewer_search_artist">Search %1$s in EhViewer</string>
+    <string name="ehviewer_not_installed">EhViewer is not installed</string>
 </resources>
