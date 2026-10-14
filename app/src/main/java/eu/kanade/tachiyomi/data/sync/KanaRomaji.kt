@@ -1,5 +1,7 @@
 package eu.kanade.tachiyomi.data.sync
 
+import java.text.Normalizer
+
 /**
  * Hepburn romanization of names written in kana, the way E-Hentai titles spell them ("チビゴン" -> "chibigon",
  * "むなしむじょう" -> "munashimujou", "エッチ" -> "ecchi"), fork-only feature: a global search for an artist nobody
@@ -16,6 +18,9 @@ object KanaRomaji {
         "みゃ" to "mya", "みゅ" to "myu", "みょ" to "myo", "りゃ" to "rya", "りゅ" to "ryu", "りょ" to "ryo",
         "ふぁ" to "fa", "ふぃ" to "fi", "ふぇ" to "fe", "ふぉ" to "fo", "てぃ" to "ti", "でぃ" to "di", "とぅ" to "tu", "どぅ" to "du",
         "うぃ" to "wi", "うぇ" to "we", "うぉ" to "wo", "ゔぁ" to "va", "ゔぃ" to "vi", "ゔぇ" to "ve", "ゔぉ" to "vo", "つぁ" to "tsa",
+        "でゅ" to "dyu", "てゅ" to "tyu", "ふゅ" to "fyu", "ゔゅ" to "vyu", "いぇ" to "ye",
+        "くぁ" to "kwa", "くぃ" to "kwi", "くぇ" to "kwe", "くぉ" to "kwo", "ぐぁ" to "gwa",
+        "すぃ" to "si", "ずぃ" to "zi", "つぃ" to "tsi", "つぇ" to "tse", "つぉ" to "tso",
     )
     private val MONOGRAPHS = mapOf(
         'あ' to "a", 'い' to "i", 'う' to "u", 'え' to "e", 'お' to "o",
@@ -40,7 +45,8 @@ object KanaRomaji {
 
     /** The romanized [text] if it is only kana (and spaces, "・", "ー"), else null. */
     fun romanize(text: String): String? {
-        val trimmed = text.trim()
+        // Half-width "ﾁﾋﾞｺﾞﾝ" and decomposed voiced marks become the usual kana
+        val trimmed = Normalizer.normalize(text, Normalizer.Form.NFKC).trim()
         if (trimmed.isEmpty() || !ALLOWED.matches(trimmed)) return null
         // Katakana to hiragana, one table for both
         val kana = buildString { trimmed.forEach { append(if (it in 'ァ'..'ヶ') it - 0x60 else it) } }

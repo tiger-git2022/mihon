@@ -15,6 +15,9 @@ class KanaRomajiTest {
         assertEquals("yappari", KanaRomaji.romanize("ヤッパリ"))
         assertEquals("sumaato fon", KanaRomaji.romanize("スマート・フォン"))
         assertEquals("tatapon", KanaRomaji.romanize("  たたぽん "))
+        assertEquals("dyurarara", KanaRomaji.romanize("デュラララ"))
+        assertEquals("kwottsu", KanaRomaji.romanize("クォッツ"))
+        assertEquals("chibigon", KanaRomaji.romanize("ﾁﾋﾞｺﾞﾝ"))
     }
 
     @Test
