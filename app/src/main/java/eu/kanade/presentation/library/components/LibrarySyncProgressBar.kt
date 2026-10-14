@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,11 +14,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import eu.kanade.presentation.components.SyncLinearProgressIndicator
 import eu.kanade.tachiyomi.ui.library.LibrarySyncActionState
 
 /**
  * Progress of a running OneDrive library sync below the library toolbar (fork-only feature): a bar for the whole
- * sync and the current step, e.g. "Syncing 6% (1/5): Library 37/120 (30%)".
+ * sync and the current step, e.g. "Syncing 6% (1/5): Library 37/120 (30%)". Its waves move while the sync runs.
  */
 @Composable
 fun LibrarySyncProgressBar(state: LibrarySyncActionState, modifier: Modifier = Modifier) {
@@ -36,7 +36,7 @@ fun LibrarySyncProgressBar(state: LibrarySyncActionState, modifier: Modifier = M
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface),
         ) {
-            LinearProgressIndicator(progress = { animated }, modifier = Modifier.fillMaxWidth())
+            SyncLinearProgressIndicator(progress = { animated }, modifier = Modifier.fillMaxWidth())
             Text(
                 text = shownText,
                 style = MaterialTheme.typography.bodySmall,

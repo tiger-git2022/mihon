@@ -216,12 +216,10 @@ fun AppBarActions(
             ) {
                 val progress = it.progress
                 if (it.isLoading && progress != null) {
-                    // Fork: a ring that fills up with the progress
-                    CircularProgressIndicator(
+                    // Fork: a waving ring that fills up with the progress
+                    SyncRingProgressIndicator(
                         progress = { progress },
-                        modifier = Modifier.size(22.dp),
                         color = it.iconTint ?: LocalContentColor.current,
-                        strokeWidth = 2.5.dp,
                     )
                 } else if (it.isLoading) {
                     CircularProgressIndicator(
