@@ -379,6 +379,17 @@ data class LibrarySyncProgress(
     val percent: Int?
         get() = if (total > 0) (done * 100 / total).coerceIn(0, 100) else null
 
+    /** Progress of the whole sync from 0 to 1: the steps done, plus the part of the current step that is known. */
+    val fraction: Float
+        get() {
+            val stepFraction = when {
+                total > 0 -> (done.toFloat() / total).coerceIn(0f, 1f)
+                stage == SettingsBackupStage.UPLOAD -> 0.5f
+                else -> 0f
+            }
+            return ((step.number - 1 + stepFraction) / STEP_COUNT).coerceIn(0f, 1f)
+        }
+
     companion object {
         const val STEP_COUNT = 5
     }

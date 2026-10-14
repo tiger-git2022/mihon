@@ -38,8 +38,10 @@ import tachiyomi.presentation.core.util.collectAsState
 class LibrarySyncActionState(
     val isSyncing: Boolean,
     val onClick: () -> Unit,
-    /** Current sync step and progress, e.g. "Syncing (1/4): Library 37/120 (30%)". */
+    /** Current sync step and progress, e.g. "Syncing 6% (1/5): Library 37/120 (30%)". */
     val progressText: String?,
+    /** Progress of the whole sync from 0 to 1, null when no sync runs. */
+    val progress: Float?,
 )
 
 @Composable
@@ -63,6 +65,7 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
     return LibrarySyncActionState(
         isSyncing = isSyncing || progress != null,
         progressText = progressText,
+        progress = progress?.fraction,
         onClick = onClick@{
             if (accountName.isBlank()) {
                 navigator.push(SettingsScreen(SettingsScreen.Destination.DataAndStorage))
@@ -113,6 +116,7 @@ internal fun librarySyncProgressText(progress: LibrarySyncProgress): String {
         ?: stepName
     return stringResource(
         MR.strings.library_sync_progress,
+        (progress.fraction * 100).toInt(),
         progress.step.number,
         LibrarySyncProgress.STEP_COUNT,
         detail,
