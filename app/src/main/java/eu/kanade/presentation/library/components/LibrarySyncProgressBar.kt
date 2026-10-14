@@ -1,7 +1,6 @@
 package eu.kanade.presentation.library.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -30,13 +28,12 @@ fun LibrarySyncProgressBar(state: LibrarySyncActionState, modifier: Modifier = M
     if (text != null && progress != null) last[0] = text to progress
     AnimatedVisibility(visible = text != null && progress != null, modifier = modifier) {
         val (shownText, shownProgress) = last[0] ?: return@AnimatedVisibility
-        val animated by animateFloatAsState(shownProgress, label = "librarySyncProgress")
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface),
         ) {
-            SyncLinearProgressIndicator(progress = { animated }, modifier = Modifier.fillMaxWidth())
+            SyncLinearProgressIndicator(fraction = shownProgress, modifier = Modifier.fillMaxWidth())
             Text(
                 text = shownText,
                 style = MaterialTheme.typography.bodySmall,

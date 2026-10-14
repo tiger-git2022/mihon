@@ -218,7 +218,7 @@ fun AppBarActions(
                 if (it.isLoading && progress != null) {
                     // Fork: a waving ring that fills up with the progress
                     SyncRingProgressIndicator(
-                        progress = { progress },
+                        fraction = progress,
                         color = it.iconTint ?: LocalContentColor.current,
                     )
                 } else if (it.isLoading) {

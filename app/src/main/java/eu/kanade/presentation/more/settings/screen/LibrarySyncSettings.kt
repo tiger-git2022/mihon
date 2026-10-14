@@ -3,7 +3,6 @@ package eu.kanade.presentation.more.settings.screen
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -354,14 +353,11 @@ private fun Long.toDateTimeString(): String {
 
 @Composable
 private fun LibrarySyncProgressIndicator(fraction: Float?) {
-    val modifier = Modifier.padding(start = 16.dp)
-    val color = MaterialTheme.colorScheme.primary
-    if (fraction != null) {
-        val animated by animateFloatAsState(fraction, label = "librarySyncProgress")
-        SyncRingProgressIndicator(progress = {
-            animated
-        }, color = color, modifier = modifier, size = 24.dp, strokeWidth = 3.dp)
-    } else {
-        SyncRingProgressIndicator(progress = null, color = color, modifier = modifier, size = 24.dp, strokeWidth = 3.dp)
-    }
+    SyncRingProgressIndicator(
+        fraction = fraction,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp),
+        size = 24.dp,
+        strokeWidth = 3.dp,
+    )
 }

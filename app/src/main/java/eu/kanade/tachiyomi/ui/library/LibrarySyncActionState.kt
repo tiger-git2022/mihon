@@ -2,7 +2,6 @@ package eu.kanade.tachiyomi.ui.library
 
 import android.content.Context
 import android.util.Log
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -122,7 +121,6 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
         }
     }
     val fraction = progress?.fraction
-    val animatedFraction by animateFloatAsState(fraction ?: 0f, label = "librarySyncProgress")
     val title = when {
         !isSignedIn -> stringResource(MR.strings.library_sync_now)
         state == LibrarySyncState.RUNNING -> progressText ?: stringResource(MR.strings.library_sync_syncing)
@@ -142,7 +140,7 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
         iconTint = MaterialTheme.colorScheme.error.takeIf { state == LibrarySyncState.FAILED },
         onClick = onClick,
         isLoading = syncing,
-        progress = animatedFraction.takeIf { fraction != null },
+        progress = fraction,
     )
 
     return LibrarySyncActionState(
