@@ -3,13 +3,11 @@ package eu.kanade.tachiyomi.data.sync
 import android.app.ActivityManager
 import android.app.Application
 import android.content.Context
-import android.content.SharedPreferences
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Process
 import android.os.SystemClock
 import androidx.core.content.getSystemService
-import androidx.preference.PreferenceManager
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -43,7 +41,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import logcat.LogPriority
 import mihon.app.di.appGraph
-import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.manga.repository.MangaRepository
 import java.util.concurrent.TimeUnit
@@ -53,7 +50,9 @@ import java.util.concurrent.TimeUnit
  * (tiger-git2022/ehviewer-onedrive, docs/onedrive-sync-design.md, section 6):
  * - a periodic WorkManager sync at the chosen interval, optionally on unmetered networks only;
  * - one sync when the app starts;
- * - a debounced sync after local changes of the library, search history, "read before" marks or settings.
+ * - a debounced sync after local changes of the library, search history or "read before" marks.
+ *
+ * Automatic syncs leave the settings backup to manual syncs, and changing settings does not schedule one.
  *
  * Writes made by the sync itself never count as changes: the library is compared with its state right after the
  * last sync, and search history and marks are reported by the screens where the user changes them.
@@ -111,11 +110,6 @@ class LibraryAutoSync(
         processName == null || processName == context.packageName
     }
 
-    // SharedPreferences keeps listeners weakly, so this one is held here
-    private val settingsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key != null && inForeground && isSyncedSetting(key)) notifyChanged()
-    }
-
     val isAllowed: Boolean
         get() = preferences.accountId.get().isNotBlank() && preferences.autoSync.get()
 
@@ -164,8 +158,6 @@ class LibraryAutoSync(
         service.finished
             .onEach { onSyncFinished() }
             .launchIn(scope)
-        PreferenceManager.getDefaultSharedPreferences(context)
-            .registerOnSharedPreferenceChangeListener(settingsListener)
     }
 
     fun onAppForeground() {
@@ -251,7 +243,7 @@ class LibraryAutoSync(
                 if (fromChange) isChangeSyncAllowed else isAllowed
             } ?: return
             synced = result.warning == null
-            // A failed search history, marks or settings step: WorkManager retries with backoff
+            // A failed search history or marks step: WorkManager retries with backoff
             if (!synced) enqueueCatchUpWork(fromChange)
         } catch (e: CancellationException) {
             throw e
@@ -360,11 +352,6 @@ class LibraryAutoSync(
         val synced = service.lastSyncedFavorites ?: return true
         val current = mangaRepository.getFavorites().mapTo(HashSet()) { LibrarySyncKey(it.source, it.url) }
         return current != synced
-    }
-
-    private fun isSyncedSetting(key: String): Boolean {
-        // App state keys (sync options included) are not part of the settings backup
-        return !Preference.isAppState(key) && !Preference.isPrivate(key)
     }
 
     private fun isNetworkAllowed(): Boolean {

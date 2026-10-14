@@ -88,24 +88,25 @@ class LibrarySyncService(
      * Syncs the library, then the search history, the manga marks and this device's settings
      * backup. A failure after the library step is reported in [LibrarySyncResult.warning].
      */
-    suspend fun sync(): LibrarySyncResult = checkNotNull(syncIf { true })
+    suspend fun sync(): LibrarySyncResult = checkNotNull(syncIf(manual = true) { true })
 
     /**
      * [sync], unless [canStart] returns false once the previous sync has finished. Automatic syncs check their
-     * options there, since they may have changed while the sync waited.
+     * options there, since they may have changed while the sync waited, and leave the settings backup to manual
+     * syncs ([manual] false): only the data that changes while reading is synced automatically.
      */
-    suspend fun syncIf(canStart: () -> Boolean): LibrarySyncResult? = try {
-        syncMutex.withLock { if (canStart()) syncLocked() else null }
+    suspend fun syncIf(manual: Boolean = false, canStart: () -> Boolean): LibrarySyncResult? = try {
+        syncMutex.withLock { if (canStart()) syncLocked(manual) else null }
     } finally {
         // After the lock is released, so a listener can start the next sync right away
         _finished.tryEmit(Unit)
     }
 
-    private suspend fun syncLocked(): LibrarySyncResult {
+    private suspend fun syncLocked(manual: Boolean): LibrarySyncResult {
         // This sync takes every change made so far
         _changesPending.value = false
         try {
-            return syncSteps().also { recordResult(failed = it.warning != null) }
+            return syncSteps(manual).also { recordResult(failed = it.warning != null) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -121,7 +122,7 @@ class LibrarySyncService(
         preferences.lastSyncFailed.set(failed)
     }
 
-    private suspend fun syncSteps(): LibrarySyncResult {
+    private suspend fun syncSteps(manual: Boolean): LibrarySyncResult {
         _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.LIBRARY)
         val account = oneDriveSyncClient.currentAccount()
             ?: throw LibrarySyncException("Sign in to OneDrive before syncing")
@@ -132,10 +133,14 @@ class LibrarySyncService(
         val warnings = listOfNotNull(
             runStep(LibrarySyncProgress.Step.SEARCH_HISTORY) { retryOnConflict { syncSearchHistory(device) } },
             runStep(LibrarySyncProgress.Step.MARKS) { retryOnConflict { syncMarks() } },
-            runStep(LibrarySyncProgress.Step.SETTINGS_BACKUP) {
-                settingsBackupSync.upload(device) { stage ->
-                    _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.SETTINGS_BACKUP, stage = stage)
+            if (manual) {
+                runStep(LibrarySyncProgress.Step.SETTINGS_BACKUP) {
+                    settingsBackupSync.upload(device) { stage ->
+                        _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.SETTINGS_BACKUP, stage = stage)
+                    }
                 }
+            } else {
+                null
             },
             runStep(LibrarySyncProgress.Step.EHVIEWER_FAVORITES) { ehFavoritesStore.sync() },
         )

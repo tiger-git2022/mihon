@@ -48,7 +48,7 @@
     <string name="library_sync_auto_interval_minutes">每 %d 分钟</string>
     <string name="library_sync_auto_interval_hours">每 %d 小时</string>
     <string name="library_sync_on_change">数据变化后同步</string>
-    <string name="library_sync_on_change_summary">书架、搜索记录、看过标记或设置改动后，60 秒内没有新改动就同步；从第一次改动算起最多等 5 分钟。</string>
+    <string name="library_sync_on_change_summary">书架、搜索记录或看过标记改动后，60 秒内没有新改动就同步；从第一次改动算起最多等 5 分钟。设置备份只在手动同步时上传。</string>
     <string name="library_sync_wifi_only">仅在 Wi-Fi 下自动同步</string>
     <string name="library_sync_wifi_only_summary">自动同步会等到连上不计流量的网络。“立即同步”不受限制。</string>
 
