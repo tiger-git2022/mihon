@@ -7,6 +7,7 @@ import androidx.annotation.RequiresApi
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,20 +43,29 @@ class EhFavoritesStore(
     private val _index = MutableStateFlow(EhFavoritesIndex.EMPTY)
     val index: StateFlow<EhFavoritesIndex> = _index.asStateFlow()
 
+    private val loaded = CompletableDeferred<Unit>()
+
     init {
         scope.launch {
-            mutex.withLock {
-                if (!file.exists()) return@withLock
-                runCatching { buildIndex(file.readBytes()) }
-                    .onSuccess { _index.value = it }
-                    .onFailure {
-                        logcat(LogPriority.ERROR, it) { "Could not read the EhViewer favorites" }
-                        // A damaged copy: the next sync downloads it again instead of trusting its ETag
-                        clearLocked()
-                    }
+            try {
+                mutex.withLock {
+                    if (!file.exists()) return@withLock
+                    runCatching { buildIndex(file.readBytes()) }
+                        .onSuccess { _index.value = it }
+                        .onFailure {
+                            logcat(LogPriority.ERROR, it) { "Could not read the EhViewer favorites" }
+                            // A damaged copy: the next sync downloads it again instead of trusting its ETag
+                            clearLocked()
+                        }
+                }
+            } finally {
+                loaded.complete(Unit)
             }
         }
     }
+
+    /** Waits until the copy kept from the last sync is read: [index] is empty before. */
+    suspend fun awaitLoaded() = loaded.await()
 
     /** Downloads the index EhViewer uploaded, if it changed. An index removed from OneDrive is removed here too. */
     suspend fun sync() = withContext(Dispatchers.IO) {

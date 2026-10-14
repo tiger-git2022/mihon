@@ -198,7 +198,7 @@ abstract class SearchViewModel(
     }
 
     /** Fork: another spelling of [query] to search a source with when it finds nothing, see EhNameAliases. */
-    protected open fun alternativeQuery(query: String): String? = null
+    protected open suspend fun alternativeQuery(query: String): String? = null
 
     private fun updateItems(items: Map<Source, SearchItemResult>) {
         state.update {
