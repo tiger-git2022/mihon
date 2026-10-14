@@ -9,6 +9,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.progressSemantics
 import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
@@ -24,8 +25,11 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 
 /*
@@ -50,7 +54,14 @@ fun ShimmerLinearProgress(
     height: Dp = 4.dp,
 ) {
     val sweep = if (animationsEnabled()) infiniteFraction(SHIMMER_MILLIS) else null
-    Canvas(modifier = modifier.height(height)) {
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    // From the start of the line: the right in right-to-left layouts, like the Material indicator
+    Canvas(
+        modifier = modifier
+            .height(height)
+            .progressSemantics(progress().coerceIn(0f, 1f))
+            .graphicsLayer { if (rtl) scaleX = -1f },
+    ) {
         val radius = CornerRadius(size.height / 2)
         drawRoundRect(color = trackColor, cornerRadius = radius)
         val done = size.width * progress().coerceIn(0f, 1f)
@@ -89,7 +100,7 @@ fun SoftRedrawRingProgress(
     trackColor: Color = color.copy(alpha = color.alpha * 0.2f),
 ) {
     val redraw = if (animationsEnabled()) infiniteFraction(REDRAW_MILLIS) else null
-    Canvas(modifier = modifier) {
+    Canvas(modifier = modifier.progressSemantics(progress().coerceIn(0f, 1f))) {
         val stroke = strokeWidth.toPx()
         val topLeft = Offset(stroke / 2, stroke / 2)
         val arcSize = Size(size.width - stroke, size.height - stroke)
