@@ -14,6 +14,7 @@ import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.TabContent
 import eu.kanade.tachiyomi.ui.browse.source.browse.BrowseSourceScreen
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.GlobalSearchScreen
+import eu.kanade.tachiyomi.ui.library.rememberLibrarySyncAction
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import mihon.icons.materialsymbols.MaterialSymbols
@@ -27,15 +28,18 @@ fun Screen.sourcesTab(): TabContent {
     val navigator = LocalNavigator.currentOrThrow
     val viewModel = metroViewModel<SourcesViewModel>()
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // Fork: OneDrive sync state next to the global search
+    val librarySync = rememberLibrarySyncAction()
 
     return TabContent(
         titleRes = MR.strings.label_sources,
-        actions = listOf(
+        actions = listOfNotNull(
             AppBar.Action(
                 title = stringResource(MR.strings.action_global_search),
                 icon = MaterialSymbols.Rounded.TravelExplore,
                 onClick = { navigator.push(GlobalSearchScreen()) },
             ),
+            librarySync.action.takeIf { librarySync.isSignedIn },
             AppBar.Action(
                 title = stringResource(MR.strings.action_filter),
                 icon = MaterialSymbols.Rounded.FilterList,

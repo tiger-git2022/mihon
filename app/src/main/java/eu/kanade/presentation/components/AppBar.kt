@@ -214,7 +214,16 @@ fun AppBarActions(
                 onClick = it.onClick,
                 enabled = it.enabled,
             ) {
-                if (it.isLoading) {
+                val progress = it.progress
+                if (it.isLoading && progress != null) {
+                    // Fork: a ring that fills up with the progress
+                    CircularProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.size(22.dp),
+                        color = it.iconTint ?: LocalContentColor.current,
+                        strokeWidth = 2.5.dp,
+                    )
+                } else if (it.isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
                         color = it.iconTint ?: LocalContentColor.current,
@@ -453,6 +462,8 @@ sealed interface AppBar {
         val onClick: () -> Unit,
         val enabled: Boolean = true,
         val isLoading: Boolean = false,
+        /** Fork: progress from 0 to 1 shown while [isLoading], an endless spinner when null. */
+        val progress: Float? = null,
     ) : AppBarAction
 
     data class OverflowAction(

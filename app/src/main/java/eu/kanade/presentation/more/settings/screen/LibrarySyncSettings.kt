@@ -3,6 +3,7 @@ package eu.kanade.presentation.more.settings.screen
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -145,7 +146,7 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
                             else -> stringResource(MR.strings.library_sync_now)
                         },
                         widget = if (syncProgress != null) {
-                            { LibrarySyncProgressIndicator(syncProgress?.percent) }
+                            { LibrarySyncProgressIndicator(syncProgress?.fraction) }
                         } else {
                             null
                         },
@@ -351,12 +352,13 @@ private fun Long.toDateTimeString(): String {
 }
 
 @Composable
-private fun LibrarySyncProgressIndicator(percent: Int?) {
+private fun LibrarySyncProgressIndicator(fraction: Float?) {
     val modifier = Modifier
         .padding(start = 16.dp)
         .size(24.dp)
-    if (percent != null) {
-        CircularProgressIndicator(progress = { percent / 100f }, modifier = modifier, strokeWidth = 3.dp)
+    if (fraction != null) {
+        val animated by animateFloatAsState(fraction, label = "librarySyncProgress")
+        CircularProgressIndicator(progress = { animated }, modifier = modifier, strokeWidth = 3.dp)
     } else {
         CircularProgressIndicator(modifier = modifier, strokeWidth = 3.dp)
     }

@@ -205,6 +205,7 @@ class LibraryAutoSync(
     /** Called by the screens where the user changes synced data. */
     fun notifyChanged() {
         if (!isChangeSyncAllowed) return
+        service.markChangesPending()
         synchronized(lock) {
             if (service.isSyncing) {
                 pendingAfterSync = true

@@ -19,7 +19,6 @@ import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.rounded.FilterList
 import mihon.icons.materialsymbols.rounded.FlipToBack
 import mihon.icons.materialsymbols.rounded.SelectAll
-import mihon.icons.materialsymbols.rounded.Sync
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.Pill
 import tachiyomi.presentation.core.i18n.stringResource
@@ -34,9 +33,7 @@ fun LibraryToolbar(
     onClickSelectAll: () -> Unit,
     onClickInvertSelection: () -> Unit,
     onClickFilter: () -> Unit,
-    onClickLibrarySync: () -> Unit,
-    isLibrarySyncing: Boolean,
-    librarySyncProgress: String?,
+    librarySyncAction: AppBar.Action,
     onClickRefresh: () -> Unit,
     onClickGlobalUpdate: () -> Unit,
     onClickOpenRandomManga: () -> Unit,
@@ -56,9 +53,7 @@ fun LibraryToolbar(
         searchQuery = searchQuery,
         onSearchQueryChange = onSearchQueryChange,
         onClickFilter = onClickFilter,
-        onClickLibrarySync = onClickLibrarySync,
-        isLibrarySyncing = isLibrarySyncing,
-        librarySyncProgress = librarySyncProgress,
+        librarySyncAction = librarySyncAction,
         onClickRefresh = onClickRefresh,
         onClickGlobalUpdate = onClickGlobalUpdate,
         onClickOpenRandomManga = onClickOpenRandomManga,
@@ -73,9 +68,7 @@ private fun LibraryRegularToolbar(
     searchQuery: String?,
     onSearchQueryChange: (String?) -> Unit,
     onClickFilter: () -> Unit,
-    onClickLibrarySync: () -> Unit,
-    isLibrarySyncing: Boolean,
-    librarySyncProgress: String?,
+    librarySyncAction: AppBar.Action,
     onClickRefresh: () -> Unit,
     onClickGlobalUpdate: () -> Unit,
     onClickOpenRandomManga: () -> Unit,
@@ -112,16 +105,8 @@ private fun LibraryRegularToolbar(
                         iconTint = filterTint,
                         onClick = onClickFilter,
                     ),
-                    AppBar.Action(
-                        title = when {
-                            !isLibrarySyncing -> stringResource(MR.strings.library_sync_now)
-                            else -> librarySyncProgress ?: stringResource(MR.strings.library_sync_syncing)
-                        },
-                        icon = MaterialSymbols.Rounded.Sync,
-                        onClick = onClickLibrarySync,
-                        enabled = !isLibrarySyncing,
-                        isLoading = isLibrarySyncing,
-                    ),
+                    // Fork: OneDrive sync state, see LibrarySyncActionState
+                    librarySyncAction,
                     AppBar.OverflowAction(
                         title = stringResource(MR.strings.action_update_library),
                         onClick = onClickGlobalUpdate,
