@@ -58,7 +58,7 @@
     <string name="library_sync_auto_interval_minutes">Every %d minutes</string>
     <string name="library_sync_auto_interval_hours">Every %d h</string>
     <string name="library_sync_on_change">Sync after changes</string>
-    <string name="library_sync_on_change_summary">Syncs 60 s after the last change to the library, search history, read marks or settings, at most 5 min after the first one.</string>
+    <string name="library_sync_on_change_summary">Syncs 60 s after the last change to the library, search history or read marks, at most 5 min after the first one. The settings backup is uploaded by manual syncs only.</string>
     <string name="library_sync_wifi_only">Only on Wi-Fi</string>
     <string name="library_sync_wifi_only_summary">Automatic syncs wait for an unmetered network. Sync now always works.</string>
 
