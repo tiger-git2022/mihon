@@ -7,10 +7,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -30,7 +30,7 @@ import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
 
 // Global search history (fork-only feature), kept in its own file to avoid merge conflicts.
-// Two columns; long queries wrap instead of being cut off.
+// Two staggered columns: each entry goes to the shorter column, so a long query leaves no gap beside it.
 @Composable
 internal fun GlobalSearchHistoryContent(
     history: List<SearchHistoryItem>,
@@ -39,16 +39,16 @@ internal fun GlobalSearchHistoryContent(
     onDelete: (String) -> Unit,
     onClear: () -> Unit,
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
+    LazyVerticalStaggeredGrid(
+        columns = StaggeredGridCells.Fixed(2),
         contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalItemSpacing = 8.dp,
         modifier = Modifier.padding(horizontal = 12.dp),
     ) {
         item(
             key = "search-history-header",
-            span = { GridItemSpan(maxLineSpan) },
+            span = StaggeredGridItemSpan.FullLine,
         ) {
             ListItem(
                 headlineContent = { Text(stringResource(MR.strings.recent_searches)) },
