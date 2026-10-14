@@ -229,3 +229,12 @@ jobs:
             --title "Mihon Tiger $TAG" \
             --notes-file release-notes.md \
             --latest
+
+          # The app reads this from /releases/latest/download/update.json: the API's release object, served like
+          # any release download, without api.github.com's limit of 60 requests an hour per IP.
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '{
+            tag_name, body, html_url,
+            assets: [.assets[] | select(.name | endswith(".apk")) | {name, browser_download_url}]
+          }' > update.json
+          cat update.json
+          gh release upload "$TAG" update.json --repo "$GITHUB_REPOSITORY" --clobber
