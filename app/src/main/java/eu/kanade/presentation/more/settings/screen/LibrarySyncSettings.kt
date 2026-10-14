@@ -3,16 +3,15 @@ package eu.kanade.presentation.more.settings.screen
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import eu.kanade.presentation.components.SyncRingProgressIndicator
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.tachiyomi.data.sync.LibrarySyncPreferences
 import eu.kanade.tachiyomi.data.sync.SettingsBackup
@@ -353,13 +353,11 @@ private fun Long.toDateTimeString(): String {
 
 @Composable
 private fun LibrarySyncProgressIndicator(fraction: Float?) {
-    val modifier = Modifier
-        .padding(start = 16.dp)
-        .size(24.dp)
-    if (fraction != null) {
-        val animated by animateFloatAsState(fraction, label = "librarySyncProgress")
-        CircularProgressIndicator(progress = { animated }, modifier = modifier, strokeWidth = 3.dp)
-    } else {
-        CircularProgressIndicator(modifier = modifier, strokeWidth = 3.dp)
-    }
+    SyncRingProgressIndicator(
+        fraction = fraction,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp),
+        size = 24.dp,
+        strokeWidth = 3.dp,
+    )
 }
