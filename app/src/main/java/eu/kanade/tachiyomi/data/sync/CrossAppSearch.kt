@@ -9,7 +9,7 @@ import android.content.Intent
  * (event, circle, parody, language, translator), or the artist of its leading bracket group.
  */
 object CrossAppSearch {
-    private val BRACKET_GROUPS = Regex("""\[[^\]]*]|\([^)]*\)|【[^】]*】|（[^）]*）|\{[^}]*}|［[^］]*］""")
+    private val BRACKET_GROUPS = Regex("""\[[^\]]*\]|\([^)]*\)|【[^】]*】|（[^）]*）|\{[^}]*\}|［[^］]*］""")
     private val LEADING_GROUP = Regex("""^\s*(?:(?:\([^)]*\)|（[^）]*）)\s*)*[\[【［]([^\]】］]+)[\]】］]""")
     private val INNER_PARENS = Regex("""[(（]([^)）]+)[)）]""")
     private val SPACES = Regex("""\s+""")
