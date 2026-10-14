@@ -184,7 +184,7 @@ abstract class SearchViewModel(
                         if (isActive) {
                             updateItem(source, SearchItemResult.Success(titles, foundAs))
                             // Fork: the alternatives changed while this source searched, its retry may have missed it
-                            if (titles.isEmpty() && alternativesVersion != version) retryWithAlternative()
+                            if (titles.isEmpty() && alternativesVersion != version) retryWithAlternative(source)
                         }
                     } catch (e: Exception) {
                         if (isActive) {
@@ -217,27 +217,32 @@ abstract class SearchViewModel(
 
     /**
      * Fork: searches the sources that found nothing for the last query again with its other spelling, now that
-     * [alternativeQuery] may know one (the EhViewer favorites arrived after the search).
+     * [alternativeQuery] may know one (the EhViewer favorites arrived after the search); only [source] if given.
      */
-    protected fun retryWithAlternative() {
+    protected fun retryWithAlternative(source: Source? = null) {
         val query = lastQuery ?: return
-        val empty = state.value.items.filterValues { it is SearchItemResult.Success && it.isEmpty }.keys
+        val empty = state.value.items
+            .filter { (s, result) ->
+                (source == null || s == source) && result is SearchItemResult.Success &&
+                    result.isEmpty
+            }
+            .keys
         if (empty.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
             val alternative = alternativeQuery(query) ?: return@launch
-            empty.map { source ->
+            empty.map { target ->
                 async {
                     val titles = try {
-                        searchSource(source, alternative)
+                        searchSource(target, alternative)
                     } catch (e: Exception) {
                         return@async
                     }
                     // Another search may have started meanwhile
-                    val current = state.value.items[source]
+                    val current = state.value.items[target]
                     if (titles.isNotEmpty() && lastQuery == query && current is SearchItemResult.Success &&
                         current.isEmpty
                     ) {
-                        updateItem(source, SearchItemResult.Success(titles, alternative))
+                        updateItem(target, SearchItemResult.Success(titles, alternative))
                     }
                 }
             }.awaitAll()
