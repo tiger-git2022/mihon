@@ -9,6 +9,8 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactoryKey
 import eu.kanade.domain.source.service.SourcePreferences
+import eu.kanade.tachiyomi.data.sync.EhFavoritesStore
+import eu.kanade.tachiyomi.data.sync.KanaRomaji
 import eu.kanade.tachiyomi.data.sync.LibraryAutoSync
 import eu.kanade.tachiyomi.data.sync.LibrarySyncPreferences
 import eu.kanade.tachiyomi.data.sync.SearchHistoryEntry
@@ -16,6 +18,7 @@ import eu.kanade.tachiyomi.data.sync.SearchHistoryMerger
 import eu.kanade.tachiyomi.data.sync.SyncDevice
 import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.source.Source
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import tachiyomi.domain.manga.interactor.GetManga
@@ -36,6 +39,7 @@ class GlobalSearchViewModel(
     private val searchHistoryPreferences: GlobalSearchHistoryPreferences,
     private val librarySyncPreferences: LibrarySyncPreferences,
     private val libraryAutoSync: LibraryAutoSync,
+    private val ehFavoritesStore: EhFavoritesStore,
 ) : SearchViewModel(
     initialState = State(
         searchQuery = initialQuery,
@@ -96,6 +100,29 @@ class GlobalSearchViewModel(
         updateSearchQuery(query)
         updateSearchHistory { entries, device, now -> entries.withSearchQuery(query, device, now) }
         super.search()
+    }
+
+    // The other spelling of an artist, circle or title the EhViewer favorites list both ways, else the romanized
+    // kana of a name nobody favorited
+    override suspend fun alternativeQuery(query: String): String? {
+        val aliases = if (librarySyncPreferences.showEhViewerFavorites.get()) {
+            // Read from disk after a cold start; favorites downloaded later search the empty sources again, see init
+            ehFavoritesStore.awaitLoaded()
+            ehFavoritesStore.index.value.aliases
+        } else {
+            null
+        }
+        return aliases?.alternative(query) ?: KanaRomaji.romanize(query)
+    }
+
+    init {
+        // Favorites downloaded after the search (first sign-in, a sync waiting for Wi-Fi) may name the other spelling
+        ehFavoritesStore.index.drop(1)
+            .onEach {
+                alternativesVersion++
+                retryWithAlternative()
+            }
+            .launchIn(viewModelScope)
     }
 
     fun removeSearchHistory(query: String) {

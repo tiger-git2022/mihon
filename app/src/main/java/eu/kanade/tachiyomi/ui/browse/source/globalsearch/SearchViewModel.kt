@@ -162,17 +162,29 @@ abstract class SearchViewModel(
                     }
 
                     try {
-                        val page = withContext(coroutineDispatcher) {
-                            source.getSearchManga(1, query, source.getFilterList())
+                        var titles = searchSource(source, query)
+                        // Fork: nothing found, the source may spell the name the other way ("Chibigon", "チビゴン")
+                        var foundAs: String? = null
+                        val version = alternativesVersion
+                        if (titles.isEmpty() && isActive) {
+                            alternativeQuery(query)?.let { alternative ->
+                                // A failed second try leaves the empty result of the first
+                                val other = try {
+                                    searchSource(source, alternative)
+                                } catch (e: Exception) {
+                                    emptyList()
+                                }
+                                if (other.isNotEmpty()) {
+                                    titles = other
+                                    foundAs = alternative
+                                }
+                            }
                         }
 
-                        val titles = page.mangas
-                            .map { it.toDomainManga(source.id) }
-                            .distinctBy { it.url }
-                            .let { networkToLocalManga(it) }
-
                         if (isActive) {
-                            updateItem(source, SearchItemResult.Success(titles))
+                            updateItem(source, SearchItemResult.Success(titles, foundAs))
+                            // Fork: the alternatives changed while this source searched, its retry may have missed it
+                            if (titles.isEmpty() && alternativesVersion != version) retryWithAlternative(source)
                         }
                     } catch (e: Exception) {
                         if (isActive) {
@@ -182,6 +194,58 @@ abstract class SearchViewModel(
                 }
             }
                 .awaitAll()
+        }
+    }
+
+    private suspend fun searchSource(source: Source, text: String): List<Manga> {
+        val page = withContext(coroutineDispatcher) {
+            source.getSearchManga(1, text, source.getFilterList())
+        }
+
+        return page.mangas
+            .map { it.toDomainManga(source.id) }
+            .distinctBy { it.url }
+            .let { networkToLocalManga(it) }
+    }
+
+    /** Fork: another spelling of [query] to search a source with when it finds nothing, see EhNameAliases. */
+    protected open suspend fun alternativeQuery(query: String): String? = null
+
+    /** Fork: raised by subclasses before [retryWithAlternative] when the alternatives change. */
+    @Volatile
+    protected var alternativesVersion = 0
+
+    /**
+     * Fork: searches the sources that found nothing for the last query again with its other spelling, now that
+     * [alternativeQuery] may know one (the EhViewer favorites arrived after the search); only [source] if given.
+     */
+    protected fun retryWithAlternative(source: Source? = null) {
+        val query = lastQuery ?: return
+        val empty = state.value.items
+            .filter { (s, result) ->
+                (source == null || s == source) && result is SearchItemResult.Success &&
+                    result.isEmpty
+            }
+            .keys
+        if (empty.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val alternative = alternativeQuery(query) ?: return@launch
+            empty.map { target ->
+                async {
+                    val titles = try {
+                        searchSource(target, alternative)
+                    } catch (e: Exception) {
+                        return@async
+                    }
+                    // Another search may have started meanwhile
+                    val current = state.value.items[target]
+                    if (titles.isNotEmpty() && lastQuery == query && current is SearchItemResult.Success &&
+                        current.isEmpty
+                    ) {
+                        updateItem(target, SearchItemResult.Success(titles, alternative))
+                    }
+                }
+            }.awaitAll()
         }
     }
 
@@ -248,6 +312,8 @@ sealed interface SearchItemResult {
 
     data class Success(
         val result: List<Manga>,
+        // Fork: the other spelling of the query that found these, see SearchViewModel.alternativeQuery
+        val foundAs: String? = null,
     ) : SearchItemResult {
         val isEmpty: Boolean
             get() = result.isEmpty()

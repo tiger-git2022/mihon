@@ -68,7 +68,9 @@ class GlobalSearchScreen(
                 onChangeSearchFilter = viewModel::setSourceFilter,
                 onToggleResults = viewModel::toggleFilterResults,
                 onClickSource = {
-                    navigator.push(BrowseSourceScreen(it.id, state.searchQuery))
+                    // Fork: the spelling that found its results
+                    val query = (state.items[it] as? SearchItemResult.Success)?.foundAs ?: state.searchQuery
+                    navigator.push(BrowseSourceScreen(it.id, query))
                 },
                 onClickItem = { navigator.push(MangaScreen(it.id, true)) },
                 onLongClickItem = { navigator.push(MangaScreen(it.id, true)) },

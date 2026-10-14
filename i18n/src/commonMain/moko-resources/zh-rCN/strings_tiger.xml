@@ -67,4 +67,5 @@
     <string name="ehviewer_search_title">在 EhViewer 中搜索标题</string>
     <string name="ehviewer_search_artist">在 EhViewer 中搜索「%1$s」</string>
     <string name="ehviewer_not_installed">没有安装 EhViewer</string>
+    <string name="global_search_alternative_query">用「%1$s」搜到</string>
 </resources>
