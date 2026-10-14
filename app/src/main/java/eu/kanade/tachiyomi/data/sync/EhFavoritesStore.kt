@@ -67,35 +67,44 @@ class EhFavoritesStore(
     /** Waits until the copy kept from the last sync is read: [index] is empty before. */
     suspend fun awaitLoaded() = loaded.await()
 
-    /** Downloads the index EhViewer uploaded, if it changed. An index removed from OneDrive is removed here too. */
-    suspend fun sync() = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            if (!preferences.showEhViewerFavorites.get()) return@withLock
-            val eTag = oneDriveSyncClient.eTag(EhFavoritesIndexFile.PATH)
-            if (eTag == null) {
-                // EhViewer stopped sharing its favorites, or its cloud data was cleared
-                clearLocked()
-                return@withLock
+    /**
+     * Downloads the index EhViewer uploaded, if it changed. An index removed from OneDrive is removed here too.
+     * [onProgress] follows the download (bytes) and the reading of the galleries.
+     */
+    suspend fun sync(onProgress: (EhFavoritesSyncStage, done: Long, total: Long) -> Unit = { _, _, _ -> }) =
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                if (!preferences.showEhViewerFavorites.get()) return@withLock
+                val eTag = oneDriveSyncClient.eTag(EhFavoritesIndexFile.PATH)
+                if (eTag == null) {
+                    // EhViewer stopped sharing its favorites, or its cloud data was cleared
+                    clearLocked()
+                    return@withLock
+                }
+                if (eTag == preferences.ehViewerFavoritesETag.get() && file.exists()) return@withLock
+                val bytes = oneDriveSyncClient.readBytes(EhFavoritesIndexFile.PATH) { read, size ->
+                    onProgress(EhFavoritesSyncStage.DOWNLOAD, read, size)
+                }
+                if (bytes == null) {
+                    clearLocked()
+                    return@withLock
+                }
+                onProgress(EhFavoritesSyncStage.READ, 0, 0)
+                val index = buildIndex(bytes) { done, total ->
+                    onProgress(EhFavoritesSyncStage.READ, done.toLong(), total.toLong())
+                }
+                file.parentFile?.mkdirs()
+                val temp = File(file.parentFile, "${file.name}.tmp")
+                temp.writeBytes(bytes)
+                if (!temp.renameTo(file)) {
+                    file.delete()
+                    temp.renameTo(file)
+                }
+                _index.value = index
+                preferences.ehViewerFavoritesETag.set(eTag)
+                logcat(LogPriority.INFO) { "EhViewer favorites: ${index.file.galleries.size} galleries" }
             }
-            if (eTag == preferences.ehViewerFavoritesETag.get() && file.exists()) return@withLock
-            val bytes = oneDriveSyncClient.readBytes(EhFavoritesIndexFile.PATH)
-            if (bytes == null) {
-                clearLocked()
-                return@withLock
-            }
-            val index = buildIndex(bytes)
-            file.parentFile?.mkdirs()
-            val temp = File(file.parentFile, "${file.name}.tmp")
-            temp.writeBytes(bytes)
-            if (!temp.renameTo(file)) {
-                file.delete()
-                temp.renameTo(file)
-            }
-            _index.value = index
-            preferences.ehViewerFavoritesETag.set(eTag)
-            logcat(LogPriority.INFO) { "EhViewer favorites: ${index.file.galleries.size} galleries" }
         }
-    }
 
     /**
      * Forgets the downloaded favorites after signing out or switching the OneDrive account, so no favorites of the
@@ -109,13 +118,13 @@ class EhFavoritesStore(
         _index.value = EhFavoritesIndex.EMPTY
     }
 
-    private fun buildIndex(bytes: ByteArray): EhFavoritesIndex {
+    private fun buildIndex(bytes: ByteArray, onProgress: ((Int, Int) -> Unit)? = null): EhFavoritesIndex {
         val text = GZIPInputStream(bytes.inputStream()).bufferedReader().use { it.readText() }
         val indexFile = json.decodeFromString(EhFavoritesIndexFile.serializer(), text)
         if (indexFile.version > EhFavoritesIndexFile.CURRENT_VERSION) {
             throw LibrarySyncException("The EhViewer favorites were written by a newer EhViewer version")
         }
-        return EhFavoritesIndex(indexFile, normalizer)
+        return EhFavoritesIndex(indexFile, normalizer, onProgress)
     }
 
     private companion object {
@@ -137,3 +146,6 @@ class EhFavoritesStore(
         }
     }
 }
+
+/** Part of [EhFavoritesStore.sync] that takes long with many favorites: the download, then reading the galleries. */
+enum class EhFavoritesSyncStage { DOWNLOAD, READ }

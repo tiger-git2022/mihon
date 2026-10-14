@@ -17,6 +17,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.AppBarActions
+import eu.kanade.tachiyomi.data.sync.EhFavoritesSyncStage
 import eu.kanade.tachiyomi.data.sync.LibrarySyncProgress
 import eu.kanade.tachiyomi.data.sync.LibrarySyncResult
 import eu.kanade.tachiyomi.data.sync.SettingsBackupStage
@@ -35,6 +36,7 @@ import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.collectAsState
+import java.util.Locale
 
 /** What the sync action shows, the first that applies. */
 enum class LibrarySyncState { RUNNING, PENDING, FAILED, SUCCEEDED, NOT_SYNCED }
@@ -172,15 +174,37 @@ internal fun librarySyncProgressText(progress: LibrarySyncProgress): String {
         LibrarySyncProgress.Step.LIBRARY -> stringResource(MR.strings.library_sync_step_library)
         LibrarySyncProgress.Step.SEARCH_HISTORY -> stringResource(MR.strings.library_sync_step_search_history)
         LibrarySyncProgress.Step.MARKS -> stringResource(MR.strings.library_sync_step_marks)
-        LibrarySyncProgress.Step.EHVIEWER_FAVORITES -> stringResource(MR.strings.library_sync_step_ehviewer_favorites)
+        LibrarySyncProgress.Step.EHVIEWER_FAVORITES -> when (progress.favoritesStage) {
+            EhFavoritesSyncStage.DOWNLOAD -> stringResource(MR.strings.library_sync_step_ehviewer_favorites_download)
+            EhFavoritesSyncStage.READ -> stringResource(MR.strings.library_sync_step_ehviewer_favorites_read)
+            null -> stringResource(MR.strings.library_sync_step_ehviewer_favorites)
+        }
         LibrarySyncProgress.Step.SETTINGS_BACKUP -> when (progress.stage) {
             SettingsBackupStage.UPLOAD -> stringResource(MR.strings.library_sync_step_settings_upload)
             else -> stringResource(MR.strings.library_sync_step_settings_create)
         }
     }
-    val detail = progress.percent
-        ?.let { stringResource(MR.strings.library_sync_progress_count, stepName, progress.done, progress.total, it) }
-        ?: stepName
+    val detail = when {
+        // Bytes as megabytes: "Downloading EhViewer favorites 1.2/3.4 MB (35%)"
+        progress.favoritesStage == EhFavoritesSyncStage.DOWNLOAD ->
+            progress.percent
+                ?.let {
+                    stringResource(
+                        MR.strings.library_sync_progress_size,
+                        stepName,
+                        mb(progress.done),
+                        mb(progress.total),
+                        it,
+                    )
+                }
+                ?: stringResource(MR.strings.library_sync_progress_size_unknown, stepName, mb(progress.done))
+        else ->
+            progress.percent
+                ?.let {
+                    stringResource(MR.strings.library_sync_progress_count, stepName, progress.done, progress.total, it)
+                }
+                ?: stepName
+    }
     return stringResource(
         MR.strings.library_sync_progress,
         (progress.fraction * 100).toInt(),
@@ -189,3 +213,5 @@ internal fun librarySyncProgressText(progress: LibrarySyncProgress): String {
         detail,
     )
 }
+
+private fun mb(bytes: Int): String = String.format(Locale.ROOT, "%.1f", bytes / (1024f * 1024f))

@@ -142,7 +142,16 @@ class LibrarySyncService(
             } else {
                 null
             },
-            runStep(LibrarySyncProgress.Step.EHVIEWER_FAVORITES) { ehFavoritesStore.sync() },
+            runStep(LibrarySyncProgress.Step.EHVIEWER_FAVORITES) {
+                ehFavoritesStore.sync { stage, done, total ->
+                    _progress.value = LibrarySyncProgress(
+                        LibrarySyncProgress.Step.EHVIEWER_FAVORITES,
+                        done = done.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                        total = total.coerceIn(0, Int.MAX_VALUE.toLong()).toInt(),
+                        favoritesStage = stage,
+                    )
+                }
+            },
         )
         return result.copy(warning = warnings.takeIf { it.isNotEmpty() }?.joinToString("; "))
     }
@@ -401,6 +410,8 @@ data class LibrarySyncProgress(
     val done: Int = 0,
     val total: Int = 0,
     val stage: SettingsBackupStage? = null,
+    /** Download (bytes in [done] and [total], [total] 0 if the size is unknown) or reading of the EhViewer favorites. */
+    val favoritesStage: EhFavoritesSyncStage? = null,
 ) {
     enum class Step(val number: Int) {
         LIBRARY(1),
@@ -411,13 +422,18 @@ data class LibrarySyncProgress(
     }
 
     val percent: Int?
-        get() = if (total > 0) (done * 100 / total).coerceIn(0, 100) else null
+        // In Long: bytes of a download over 20 MB times 100 overflow an Int
+        get() = if (total > 0) (done.toLong() * 100 / total).coerceIn(0, 100).toInt() else null
 
     /** Progress of the whole sync from 0 to 1: the steps done, plus the part of the current step that is known. */
     val fraction: Float
         get() {
+            val known = if (total > 0) (done.toFloat() / total).coerceIn(0f, 1f) else 0f
             val stepFraction = when {
-                total > 0 -> (done.toFloat() / total).coerceIn(0f, 1f)
+                // The download and the reading of the favorites take about half of their step each
+                favoritesStage == EhFavoritesSyncStage.DOWNLOAD -> known / 2
+                favoritesStage == EhFavoritesSyncStage.READ -> 0.5f + known / 2
+                total > 0 -> known
                 stage == SettingsBackupStage.UPLOAD -> 0.5f
                 else -> 0f
             }
