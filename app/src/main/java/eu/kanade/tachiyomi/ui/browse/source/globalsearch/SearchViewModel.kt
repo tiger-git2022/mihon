@@ -165,15 +165,26 @@ abstract class SearchViewModel(
                         var titles = searchSource(source, query)
                         // Fork: nothing found, the source may spell the name the other way ("Chibigon", "チビゴン")
                         var foundAs: String? = null
+                        val version = alternativesVersion
                         if (titles.isEmpty() && isActive) {
                             alternativeQuery(query)?.let { alternative ->
-                                titles = searchSource(source, alternative)
-                                if (titles.isNotEmpty()) foundAs = alternative
+                                // A failed second try leaves the empty result of the first
+                                val other = try {
+                                    searchSource(source, alternative)
+                                } catch (e: Exception) {
+                                    emptyList()
+                                }
+                                if (other.isNotEmpty()) {
+                                    titles = other
+                                    foundAs = alternative
+                                }
                             }
                         }
 
                         if (isActive) {
                             updateItem(source, SearchItemResult.Success(titles, foundAs))
+                            // Fork: the alternatives changed while this source searched, its retry may have missed it
+                            if (titles.isEmpty() && alternativesVersion != version) retryWithAlternative()
                         }
                     } catch (e: Exception) {
                         if (isActive) {
@@ -199,6 +210,10 @@ abstract class SearchViewModel(
 
     /** Fork: another spelling of [query] to search a source with when it finds nothing, see EhNameAliases. */
     protected open suspend fun alternativeQuery(query: String): String? = null
+
+    /** Fork: raised by subclasses before [retryWithAlternative] when the alternatives change. */
+    @Volatile
+    protected var alternativesVersion = 0
 
     /**
      * Fork: searches the sources that found nothing for the last query again with its other spelling, now that

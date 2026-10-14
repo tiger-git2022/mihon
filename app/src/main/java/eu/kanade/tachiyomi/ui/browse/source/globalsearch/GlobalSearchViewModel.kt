@@ -118,7 +118,10 @@ class GlobalSearchViewModel(
     init {
         // Favorites downloaded after the search (first sign-in, a sync waiting for Wi-Fi) may name the other spelling
         ehFavoritesStore.index.drop(1)
-            .onEach { retryWithAlternative() }
+            .onEach {
+                alternativesVersion++
+                retryWithAlternative()
+            }
             .launchIn(viewModelScope)
     }
 
