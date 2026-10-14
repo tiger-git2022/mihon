@@ -2,6 +2,8 @@ package eu.kanade.tachiyomi.ui.library
 
 import android.content.Context
 import android.util.Log
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -14,6 +16,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import eu.kanade.presentation.components.AppBar
+import eu.kanade.presentation.components.AppBarActions
 import eu.kanade.tachiyomi.data.sync.LibrarySyncProgress
 import eu.kanade.tachiyomi.data.sync.LibrarySyncResult
 import eu.kanade.tachiyomi.data.sync.SettingsBackupStage
@@ -23,25 +27,39 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mihon.app.di.appGraph
+import mihon.icons.materialsymbols.MaterialSymbols
+import mihon.icons.materialsymbols.rounded.DoneAll
+import mihon.icons.materialsymbols.rounded.Error
+import mihon.icons.materialsymbols.rounded.Schedule
+import mihon.icons.materialsymbols.rounded.Sync
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.collectAsState
 
+/** What the sync action shows, the first that applies. */
+enum class LibrarySyncState { RUNNING, PENDING, FAILED, SUCCEEDED, NOT_SYNCED }
+
 /**
- * State of the OneDrive library sync toolbar action (fork-only feature).
+ * State of the OneDrive library sync toolbar action (fork-only feature): not synced yet, changes waiting for a sync,
+ * syncing (a ring filling up with the progress), synced, or failed. Shown on the library, the sources and the global
+ * search.
  *
- * Lives in its own file so that [LibraryTab] only needs a few lines of changes,
+ * Lives in its own file so that the upstream screens only need a few lines of changes,
  * which keeps merges with upstream simple.
  */
 @Stable
 class LibrarySyncActionState(
+    val isSignedIn: Boolean,
+    val state: LibrarySyncState,
     val isSyncing: Boolean,
     val onClick: () -> Unit,
     /** Current sync step and progress, e.g. "Syncing 6% (1/5): Library 37/120 (30%)". */
     val progressText: String?,
     /** Progress of the whole sync from 0 to 1, null when no sync runs. */
     val progress: Float?,
+    /** The toolbar action showing [state]. */
+    val action: AppBar.Action,
 )
 
 @Composable
@@ -56,42 +74,96 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
     var isSyncing by remember { mutableStateOf(false) }
     val progress by librarySyncService.progress.collectAsStateWithLifecycle()
     val progressText = progress?.let { librarySyncProgressText(it) }
+    val changesPending by librarySyncService.changesPending.collectAsStateWithLifecycle()
+    // Changes handed to background work that has not synced them yet
+    val catchUpRequested by librarySyncPreferences.catchUpRequested.collectAsState()
+    val catchUpSynced by librarySyncPreferences.catchUpSynced.collectAsState()
+    val lastSyncTime by librarySyncPreferences.lastSyncTime.collectAsState()
+    val lastSyncFailed by librarySyncPreferences.lastSyncFailed.collectAsState()
 
     LaunchedEffect(librarySyncService) {
         runCatching { librarySyncService.refreshAccount() }
             .onFailure { Log.e("LibrarySync", "Could not refresh the OneDrive account", it) }
     }
 
-    return LibrarySyncActionState(
-        isSyncing = isSyncing || progress != null,
-        progressText = progressText,
-        progress = progress?.fraction,
-        onClick = onClick@{
-            if (accountName.isBlank()) {
-                navigator.push(SettingsScreen(SettingsScreen.Destination.DataAndStorage))
-                return@onClick
-            }
-            if (isSyncing || progress != null) return@onClick
+    val syncing = isSyncing || progress != null
+    val state = when {
+        syncing -> LibrarySyncState.RUNNING
+        changesPending || catchUpRequested > catchUpSynced -> LibrarySyncState.PENDING
+        lastSyncFailed && lastSyncTime > 0 -> LibrarySyncState.FAILED
+        lastSyncTime > 0 -> LibrarySyncState.SUCCEEDED
+        else -> LibrarySyncState.NOT_SYNCED
+    }
+    val isSignedIn = accountName.isNotBlank()
+    val onClick: () -> Unit = onClick@{
+        if (!isSignedIn) {
+            navigator.push(SettingsScreen(SettingsScreen.Destination.DataAndStorage))
+            return@onClick
+        }
+        if (isSyncing || progress != null) {
+            // The step and how far it got
+            context.toast(progressText ?: context.stringResource(MR.strings.library_sync_syncing))
+            return@onClick
+        }
 
-            isSyncing = true
-            scope.launch {
-                runCatching {
-                    withContext(Dispatchers.IO) { librarySyncService.sync() }
-                }.onSuccess { result ->
-                    context.toast(context.librarySyncMessage(result))
-                }.onFailure { error ->
-                    Log.e("LibrarySync", "Library sync failed", error)
-                    context.toast(
-                        context.stringResource(
-                            MR.strings.library_sync_failed,
-                            error.message.orEmpty(),
-                        ),
-                    )
-                }
-                isSyncing = false
+        isSyncing = true
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { librarySyncService.sync() }
+            }.onSuccess { result ->
+                context.toast(context.librarySyncMessage(result))
+            }.onFailure { error ->
+                Log.e("LibrarySync", "Library sync failed", error)
+                context.toast(
+                    context.stringResource(
+                        MR.strings.library_sync_failed,
+                        error.message.orEmpty(),
+                    ),
+                )
             }
+            isSyncing = false
+        }
+    }
+    val fraction = progress?.fraction
+    val animatedFraction by animateFloatAsState(fraction ?: 0f, label = "librarySyncProgress")
+    val title = when {
+        !isSignedIn -> stringResource(MR.strings.library_sync_now)
+        state == LibrarySyncState.RUNNING -> progressText ?: stringResource(MR.strings.library_sync_syncing)
+        state == LibrarySyncState.PENDING -> stringResource(MR.strings.library_sync_status_pending)
+        state == LibrarySyncState.FAILED -> stringResource(MR.strings.library_sync_status_failed)
+        state == LibrarySyncState.SUCCEEDED -> stringResource(MR.strings.library_sync_status_succeeded)
+        else -> stringResource(MR.strings.library_sync_status_never)
+    }
+    val action = AppBar.Action(
+        title = title,
+        icon = when (state) {
+            LibrarySyncState.PENDING -> MaterialSymbols.Rounded.Schedule
+            LibrarySyncState.FAILED -> MaterialSymbols.Rounded.Error
+            LibrarySyncState.SUCCEEDED -> MaterialSymbols.Rounded.DoneAll
+            else -> MaterialSymbols.Rounded.Sync
         },
+        iconTint = MaterialTheme.colorScheme.error.takeIf { state == LibrarySyncState.FAILED },
+        onClick = onClick,
+        isLoading = syncing,
+        progress = animatedFraction.takeIf { fraction != null },
     )
+
+    return LibrarySyncActionState(
+        isSignedIn = isSignedIn,
+        state = state,
+        isSyncing = syncing,
+        onClick = onClick,
+        progressText = progressText,
+        progress = fraction,
+        action = action,
+    )
+}
+
+/** The sync action for a toolbar's actions row, nothing without a OneDrive account. */
+@Composable
+fun LibrarySyncActions() {
+    val sync = rememberLibrarySyncAction()
+    if (sync.isSignedIn) AppBarActions(listOf(sync.action))
 }
 
 internal fun Context.librarySyncMessage(result: LibrarySyncResult): String {

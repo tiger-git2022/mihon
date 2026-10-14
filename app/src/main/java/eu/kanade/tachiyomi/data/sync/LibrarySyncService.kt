@@ -50,6 +50,15 @@ class LibrarySyncService(
     /** Emits after every sync, successful or not. */
     val finished: SharedFlow<Unit> = _finished
 
+    private val _changesPending = MutableStateFlow(false)
+
+    /** True while changes wait for a sync [LibraryAutoSync] scheduled for them; the next sync takes them all. */
+    val changesPending: StateFlow<Boolean> = _changesPending.asStateFlow()
+
+    fun markChangesPending() {
+        _changesPending.value = true
+    }
+
     /** True while a sync runs; library writes seen meanwhile may come from the sync itself. */
     val isSyncing: Boolean
         get() = syncMutex.isLocked
@@ -93,28 +102,44 @@ class LibrarySyncService(
     }
 
     private suspend fun syncLocked(): LibrarySyncResult {
+        // This sync takes every change made so far
+        _changesPending.value = false
         try {
-            _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.LIBRARY)
-            val account = oneDriveSyncClient.currentAccount()
-                ?: throw LibrarySyncException("Sign in to OneDrive before syncing")
-            updateAccount(account)
-            val device = preferences.currentDevice()
-
-            val result = retryOnConflict { syncLibrary() }
-            val warnings = listOfNotNull(
-                runStep(LibrarySyncProgress.Step.SEARCH_HISTORY) { retryOnConflict { syncSearchHistory(device) } },
-                runStep(LibrarySyncProgress.Step.MARKS) { retryOnConflict { syncMarks() } },
-                runStep(LibrarySyncProgress.Step.SETTINGS_BACKUP) {
-                    settingsBackupSync.upload(device) { stage ->
-                        _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.SETTINGS_BACKUP, stage = stage)
-                    }
-                },
-                runStep(LibrarySyncProgress.Step.EHVIEWER_FAVORITES) { ehFavoritesStore.sync() },
-            )
-            return result.copy(warning = warnings.takeIf { it.isNotEmpty() }?.joinToString("; "))
+            return syncSteps().also { recordResult(failed = it.warning != null) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            recordResult(failed = true)
+            throw e
         } finally {
             _progress.value = null
         }
+    }
+
+    private fun recordResult(failed: Boolean) {
+        preferences.lastSyncTime.set(System.currentTimeMillis())
+        preferences.lastSyncFailed.set(failed)
+    }
+
+    private suspend fun syncSteps(): LibrarySyncResult {
+        _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.LIBRARY)
+        val account = oneDriveSyncClient.currentAccount()
+            ?: throw LibrarySyncException("Sign in to OneDrive before syncing")
+        updateAccount(account)
+        val device = preferences.currentDevice()
+
+        val result = retryOnConflict { syncLibrary() }
+        val warnings = listOfNotNull(
+            runStep(LibrarySyncProgress.Step.SEARCH_HISTORY) { retryOnConflict { syncSearchHistory(device) } },
+            runStep(LibrarySyncProgress.Step.MARKS) { retryOnConflict { syncMarks() } },
+            runStep(LibrarySyncProgress.Step.SETTINGS_BACKUP) {
+                settingsBackupSync.upload(device) { stage ->
+                    _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.SETTINGS_BACKUP, stage = stage)
+                }
+            },
+            runStep(LibrarySyncProgress.Step.EHVIEWER_FAVORITES) { ehFavoritesStore.sync() },
+        )
+        return result.copy(warning = warnings.takeIf { it.isNotEmpty() }?.joinToString("; "))
     }
 
     /**

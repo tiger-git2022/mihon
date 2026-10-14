@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -47,6 +48,8 @@ fun GlobalSearchToolbar(
     onlyShowHasResults: Boolean,
     onToggleResults: () -> Unit,
     scrollBehavior: TopAppBarScrollBehavior,
+    // Fork: actions right of the search field
+    actions: @Composable RowScope.() -> Unit = {},
 ) {
     Column(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
         Box {
@@ -56,6 +59,7 @@ fun GlobalSearchToolbar(
                 onSearch = onSearch,
                 onClickCloseSearch = navigateUp,
                 navigateUp = navigateUp,
+                actions = actions,
                 scrollBehavior = scrollBehavior,
             )
             if (progress in 1..<total) {

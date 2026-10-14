@@ -54,6 +54,12 @@ class LibrarySyncPreferences(
         "",
     )
 
+    // Result of the last sync, for the sync state icon
+
+    val lastSyncTime = preferenceStore.getLong(Preference.appStateKey("library_sync_last_time"), 0L)
+
+    val lastSyncFailed = preferenceStore.getBoolean(Preference.appStateKey("library_sync_last_failed"), false)
+
     // Automatic sync, see LibraryAutoSync
 
     val autoSync = preferenceStore.getBoolean(Preference.appStateKey("library_sync_auto_enabled"), true)

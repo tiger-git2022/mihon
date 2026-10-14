@@ -11,6 +11,10 @@
     <string name="library_sync_sign_in_failed">OneDrive 登录失败：%s</string>
     <string name="library_sync_now">立即同步</string>
     <string name="library_sync_syncing">正在同步…</string>
+    <string name="library_sync_status_pending">OneDrive：有改动等待同步</string>
+    <string name="library_sync_status_succeeded">OneDrive：已同步</string>
+    <string name="library_sync_status_failed">OneDrive：上次同步失败</string>
+    <string name="library_sync_status_never">OneDrive：尚未同步</string>
     <string name="library_sync_sign_out">退出 OneDrive 登录</string>
     <string name="library_sync_sign_out_success">已退出 OneDrive 登录</string>
     <string name="library_sync_sign_out_failed">退出 OneDrive 登录失败：%s</string>

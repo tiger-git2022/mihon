@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import eu.kanade.presentation.browse.components.EhFavoriteBadges
+import eu.kanade.presentation.browse.components.MangaMarkBadges
 import eu.kanade.tachiyomi.ui.library.LibraryItem
 import tachiyomi.domain.library.model.LibraryManga
 import tachiyomi.domain.manga.model.MangaCover
@@ -56,6 +58,9 @@ internal fun LibraryList(
                 badge = {
                     DownloadsBadge(count = libraryItem.badges.downloadCount)
                     UnreadBadge(count = libraryItem.badges.unreadCount)
+                    // Fork: read mark and EhViewer favorites, as in the browse grids
+                    MangaMarkBadges(manga.source, manga.url)
+                    EhFavoriteBadges(manga)
                     LanguageBadge(
                         isLocal = libraryItem.badges.isLocal,
                         sourceLanguage = libraryItem.badges.sourceLanguage,
