@@ -13,16 +13,14 @@ import eu.kanade.tachiyomi.data.sync.EhFavoritesStore
 import eu.kanade.tachiyomi.data.sync.KanaRomaji
 import eu.kanade.tachiyomi.data.sync.LibraryAutoSync
 import eu.kanade.tachiyomi.data.sync.LibrarySyncPreferences
-import eu.kanade.tachiyomi.data.sync.LibrarySyncService
 import eu.kanade.tachiyomi.data.sync.SearchHistoryEntry
 import eu.kanade.tachiyomi.data.sync.SearchHistoryMerger
 import eu.kanade.tachiyomi.data.sync.SyncDevice
 import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.source.Source
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.withTimeoutOrNull
 import tachiyomi.domain.manga.interactor.GetManga
 import tachiyomi.domain.manga.interactor.NetworkToLocalManga
 import tachiyomi.domain.source.service.SourceManager
@@ -42,7 +40,6 @@ class GlobalSearchViewModel(
     private val librarySyncPreferences: LibrarySyncPreferences,
     private val libraryAutoSync: LibraryAutoSync,
     private val ehFavoritesStore: EhFavoritesStore,
-    private val librarySyncService: LibrarySyncService,
 ) : SearchViewModel(
     initialState = State(
         searchQuery = initialQuery,
@@ -109,19 +106,20 @@ class GlobalSearchViewModel(
     // kana of a name nobody favorited
     override suspend fun alternativeQuery(query: String): String? {
         val aliases = if (librarySyncPreferences.showEhViewerFavorites.get()) {
-            // Read from disk after a cold start, downloaded by a running sync: a source answering first would
-            // otherwise find no aliases
+            // Read from disk after a cold start; favorites downloaded later search the empty sources again, see init
             ehFavoritesStore.awaitLoaded()
-            // A sync downloads the favorites in its last step (first sign-in, account switch): an empty list may be
-            // about to arrive
-            if (ehFavoritesStore.index.value.file.galleries.isEmpty() && librarySyncService.progress.value != null) {
-                withTimeoutOrNull(SYNC_WAIT_MILLIS) { librarySyncService.progress.first { it == null } }
-            }
             ehFavoritesStore.index.value.aliases
         } else {
             null
         }
         return aliases?.alternative(query) ?: KanaRomaji.romanize(query)
+    }
+
+    init {
+        // Favorites downloaded after the search (first sign-in, a sync waiting for Wi-Fi) may name the other spelling
+        ehFavoritesStore.index.drop(1)
+            .onEach { retryWithAlternative() }
+            .launchIn(viewModelScope)
     }
 
     fun removeSearchHistory(query: String) {
@@ -145,8 +143,4 @@ class GlobalSearchViewModel(
         libraryAutoSync.notifyChanged()
     }
     // endregion
-
-    private companion object {
-        const val SYNC_WAIT_MILLIS = 60_000L
-    }
 }

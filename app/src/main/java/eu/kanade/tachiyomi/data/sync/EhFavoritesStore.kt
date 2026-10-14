@@ -64,14 +64,8 @@ class EhFavoritesStore(
         }
     }
 
-    /**
-     * Waits until the copy kept from the last sync is read and a sync downloading a newer one is done: [index] is
-     * empty or outdated before.
-     */
-    suspend fun awaitLoaded() {
-        loaded.await()
-        mutex.withLock { }
-    }
+    /** Waits until the copy kept from the last sync is read: [index] is empty before. */
+    suspend fun awaitLoaded() = loaded.await()
 
     /** Downloads the index EhViewer uploaded, if it changed. An index removed from OneDrive is removed here too. */
     suspend fun sync() = withContext(Dispatchers.IO) {

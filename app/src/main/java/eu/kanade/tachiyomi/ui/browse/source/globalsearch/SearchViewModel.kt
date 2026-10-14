@@ -162,23 +162,12 @@ abstract class SearchViewModel(
                     }
 
                     try {
-                        suspend fun searchSource(text: String): List<Manga> {
-                            val page = withContext(coroutineDispatcher) {
-                                source.getSearchManga(1, text, source.getFilterList())
-                            }
-
-                            return page.mangas
-                                .map { it.toDomainManga(source.id) }
-                                .distinctBy { it.url }
-                                .let { networkToLocalManga(it) }
-                        }
-
-                        var titles = searchSource(query)
+                        var titles = searchSource(source, query)
                         // Fork: nothing found, the source may spell the name the other way ("Chibigon", "チビゴン")
                         var foundAs: String? = null
                         if (titles.isEmpty() && isActive) {
                             alternativeQuery(query)?.let { alternative ->
-                                titles = searchSource(alternative)
+                                titles = searchSource(source, alternative)
                                 if (titles.isNotEmpty()) foundAs = alternative
                             }
                         }
@@ -197,8 +186,48 @@ abstract class SearchViewModel(
         }
     }
 
+    private suspend fun searchSource(source: Source, text: String): List<Manga> {
+        val page = withContext(coroutineDispatcher) {
+            source.getSearchManga(1, text, source.getFilterList())
+        }
+
+        return page.mangas
+            .map { it.toDomainManga(source.id) }
+            .distinctBy { it.url }
+            .let { networkToLocalManga(it) }
+    }
+
     /** Fork: another spelling of [query] to search a source with when it finds nothing, see EhNameAliases. */
     protected open suspend fun alternativeQuery(query: String): String? = null
+
+    /**
+     * Fork: searches the sources that found nothing for the last query again with its other spelling, now that
+     * [alternativeQuery] may know one (the EhViewer favorites arrived after the search).
+     */
+    protected fun retryWithAlternative() {
+        val query = lastQuery ?: return
+        val empty = state.value.items.filterValues { it is SearchItemResult.Success && it.isEmpty }.keys
+        if (empty.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val alternative = alternativeQuery(query) ?: return@launch
+            empty.map { source ->
+                async {
+                    val titles = try {
+                        searchSource(source, alternative)
+                    } catch (e: Exception) {
+                        return@async
+                    }
+                    // Another search may have started meanwhile
+                    val current = state.value.items[source]
+                    if (titles.isNotEmpty() && lastQuery == query && current is SearchItemResult.Success &&
+                        current.isEmpty
+                    ) {
+                        updateItem(source, SearchItemResult.Success(titles, alternative))
+                    }
+                }
+            }.awaitAll()
+        }
+    }
 
     private fun updateItems(items: Map<Source, SearchItemResult>) {
         state.update {
