@@ -105,7 +105,8 @@ class GlobalSearchViewModel(
     // kana of a name nobody favorited
     override suspend fun alternativeQuery(query: String): String? {
         val aliases = if (librarySyncPreferences.showEhViewerFavorites.get()) {
-            // Read from disk after a cold start: a source answering first would otherwise find no aliases
+            // Read from disk after a cold start, downloaded by a running sync: a source answering first would
+            // otherwise find no aliases
             ehFavoritesStore.awaitLoaded()
             ehFavoritesStore.index.value.aliases
         } else {
