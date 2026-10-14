@@ -18,6 +18,8 @@
   - “看过”标记；
   - 本机设置备份（每台设备一份，可在“从 OneDrive 恢复设置”里选择任一设备的备份恢复；不含书架、历史和登录信息）。
   - 自动同步（默认开启，可关闭）：打开应用时、登录或切换微软账号后各同步一次；按间隔定时同步（15 分钟到 24 小时可选，默认 6 小时）；书架、搜索记录、看过标记或设置改动后，60 秒内没有新改动就同步，最多等 5 分钟；可选“仅在 Wi-Fi 下自动同步”。这些选项只保存在本机，恢复别的设备的设置时不会被覆盖。
+  - 同步时显示每一步的进度（下载云端、比对、上传、写入本机，能数的带上数量）。
+- **章节大小**：漫画详情页的章节行显示已下载章节在本机的大小（书源不提供未下载章节的大小）。
 - **全局搜索记录**：双栏显示，长关键词自动换行。
 - **全局搜索换写法重试**：某个书源搜不到结果时，按 EhViewer 收藏清单里同一本书的罗马音标题和日文标题，自动换成另一种写法再搜一次（作者、社团或标题，比如「チビゴン」↔「Chibigon」；清单里没有的纯假名名字按规则转成罗马音，汉字名字做不到），书源名旁注明「用「Chibigon」搜到」，点进书源也用这个写法。
 - **“看过”标记**：漫画详情页的“标记看过”按钮，和书架互不影响（移出书架后仍保留）。浏览书源和全局搜索结果的封面上用眼睛角标显示。E-Hentai 系画廊按画廊 ID 匹配，E-Hentai 和 ExHentai 通用。
@@ -123,6 +125,8 @@ Personal fork of [mihonapp/mihon](https://github.com/mihonapp/mihon). The `custo
   - "read before" marks;
   - a settings backup per device (restore any device's backup from "Restore settings from OneDrive"; library, history and logins are not included).
   - automatic sync (on by default): once at app start and after signing in or switching accounts, periodically (15 min to 24 h, default 6 h), and 60 s after the last change to the library, search history, marks or settings (at most 5 min after the first); optionally only on Wi-Fi. These options stay on the device and are not changed by restoring another device's settings.
+  - each step of a sync shows its progress (downloading, comparing, uploading, updating this device, with counts where known).
+- **Chapter sizes**: chapters downloaded on this device show their size in the chapter list of a manga (sources give none for chapters not downloaded).
 - **Global search history** in two columns; long queries wrap.
 - **Global search tries the other spelling**: a source that finds nothing is searched again with the other spelling of the artist, circle or title, learned from the default and Japanese titles in the EhViewer favorites ("チビゴン" ↔ "Chibigon"), else the romanized kana of the name. The source shows "Found as …", and opening it keeps that spelling.
 - **"Read before" mark**: a button on the manga details page, independent of the library (kept after removing from the library). Shown as an eye badge on covers in Browse and global search. E-Hentai galleries match by gallery ID, so E-Hentai and ExHentai share marks.

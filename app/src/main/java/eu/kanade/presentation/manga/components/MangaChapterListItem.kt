@@ -51,6 +51,8 @@ fun MangaChapterListItem(
     date: String?,
     readProgress: String?,
     scanlator: String?,
+    // Fork: size of the downloaded chapter
+    downloadedSize: String?,
     read: Boolean,
     bookmark: Boolean,
     selected: Boolean,
@@ -166,6 +168,11 @@ fun MangaChapterListItem(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
+                        }
+                        // Fork: size of the downloaded chapter
+                        if (downloadedSize != null) {
+                            if (date != null || readProgress != null || scanlator != null) DotSeparatorText()
+                            Text(text = downloadedSize, maxLines = 1)
                         }
                     }
                 }

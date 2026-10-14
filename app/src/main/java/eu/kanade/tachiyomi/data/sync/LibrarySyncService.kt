@@ -181,6 +181,7 @@ class LibrarySyncService(
 
     private suspend fun syncSearchHistory(device: SyncDevice) {
         val now = Clock.System.now().toEpochMilliseconds()
+        phase(LibrarySyncProgress.Phase.DOWNLOAD)
         val remoteDocument = oneDriveSyncClient.readDocument(SearchHistorySyncFile.FILE_NAME)
         val cloud = remoteDocument.contents?.takeIf(String::isNotBlank)
             ?.let { json.decodeFromString<SearchHistorySyncFile>(it) }
@@ -194,6 +195,7 @@ class LibrarySyncService(
         }
         val clearedAt = maxOf(searchHistoryPreferences.clearedAt.get(), cloud.clearedAt)
         val merged = SearchHistoryMerger.merge(local, cloud.entries, now, clearedAt)
+        phase(LibrarySyncProgress.Phase.UPLOAD)
         oneDriveSyncClient.writeDocument(
             fileName = SearchHistorySyncFile.FILE_NAME,
             contents = json.encodeToString(SearchHistorySyncFile(entries = merged, clearedAt = clearedAt)),
@@ -207,6 +209,7 @@ class LibrarySyncService(
     }
 
     private suspend fun syncMarks() {
+        phase(LibrarySyncProgress.Phase.DOWNLOAD)
         val remoteDocument = oneDriveSyncClient.readDocument(MangaMarksFile.FILE_NAME)
         val cloud = remoteDocument.contents?.takeIf(String::isNotBlank)
             ?.let { json.decodeFromString<MangaMarksFile>(it) }
@@ -215,6 +218,7 @@ class LibrarySyncService(
             throw LibrarySyncException("The marks sync file was created by a newer app version")
         }
         val merged = MangaMarksMerger.merge(mangaMarkStore.get(), cloud)
+        phase(LibrarySyncProgress.Phase.UPLOAD)
         oneDriveSyncClient.writeDocument(
             fileName = MangaMarksFile.FILE_NAME,
             contents = json.encodeToString(merged),
@@ -237,14 +241,22 @@ class LibrarySyncService(
         }
     }
 
+    /** Shows [phase] of the current step, see [LibrarySyncProgress.phase]. */
+    private fun phase(phase: LibrarySyncProgress.Phase, done: Int = 0, total: Int = 0) {
+        val step = _progress.value?.step ?: return
+        _progress.value = LibrarySyncProgress(step, done, total, phase = phase)
+    }
+
     private suspend fun syncLibrary(): LibrarySyncResult {
         val now = Clock.System.now().toEpochMilliseconds()
+        phase(LibrarySyncProgress.Phase.DOWNLOAD)
         val remoteDocument = oneDriveSyncClient.readDocument()
         val cloud = readSyncFile(remoteDocument.contents)
         val baseline = readBaseline()
         val localState = collectLocalState(cloud, baseline, now)
         val merged = LibrarySyncMerger.merge(localState.entries, cloud, baseline, now)
 
+        phase(LibrarySyncProgress.Phase.UPLOAD)
         oneDriveSyncClient.writeDocument(
             contents = json.encodeToString(merged),
             etag = remoteDocument.etag,
@@ -304,14 +316,12 @@ class LibrarySyncService(
         val cloudByKey = cloud.entries.associateBy(LibrarySyncEntry::key)
         val baselineByKey = baseline?.entries.orEmpty().associateBy(LibrarySyncEntry::key)
         val keys = favoriteByKey.keys + cloudByKey.keys + baselineByKey.keys
-        // Comparing and then applying each entry: about twice the number of entries
         var compared = 0
-        val progressTotal = keys.size * 2
         val entries = mutableMapOf<LibrarySyncKey, LibrarySyncEntry>()
         val mangaByKey = mutableMapOf<LibrarySyncKey, Manga?>()
 
         for (key in keys) {
-            _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.LIBRARY, compared++, progressTotal)
+            phase(LibrarySyncProgress.Phase.COMPARE, compared++, keys.size)
             val existing = favoriteByKey[key]
                 ?: mangaRepository.getMangaByUrlAndSourceId(key.mangaUrl, key.sourceId)
             mangaByKey[key] = existing
@@ -352,10 +362,8 @@ class LibrarySyncService(
         var added = 0
         var removed = 0
 
-        val compared = knownManga.size
-        val progressTotal = compared + merged.entries.size
         for ((index, entry) in merged.entries.withIndex()) {
-            _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.LIBRARY, compared + index, progressTotal)
+            phase(LibrarySyncProgress.Phase.APPLY, index, merged.entries.size)
             val existing = knownManga[entry.key]
                 ?: mangaRepository.getMangaByUrlAndSourceId(entry.mangaUrl, entry.sourceId)
             when {
@@ -412,7 +420,17 @@ data class LibrarySyncProgress(
     val stage: SettingsBackupStage? = null,
     /** Download (bytes in [done] and [total], [total] 0 if the size is unknown) or reading of the EhViewer favorites. */
     val favoritesStage: EhFavoritesSyncStage? = null,
+    /** Part of the library, search history or marks step, with [done] of [total] entries where they are counted. */
+    val phase: Phase? = null,
 ) {
+    /** Parts of a step and the share of it each takes. */
+    enum class Phase(val part: ClosedFloatingPointRange<Float>) {
+        DOWNLOAD(0f..0.2f),
+        COMPARE(0.2f..0.5f),
+        UPLOAD(0.5f..0.6f),
+        APPLY(0.6f..1f),
+    }
+
     enum class Step(val number: Int) {
         LIBRARY(1),
         SEARCH_HISTORY(2),
@@ -433,6 +451,7 @@ data class LibrarySyncProgress(
                 // The download and the reading of the favorites take about half of their step each
                 favoritesStage == EhFavoritesSyncStage.DOWNLOAD -> known / 2
                 favoritesStage == EhFavoritesSyncStage.READ -> 0.5f + known / 2
+                phase != null -> phase.part.start + (phase.part.endInclusive - phase.part.start) * known
                 total > 0 -> known
                 stage == SettingsBackupStage.UPLOAD -> 0.5f
                 else -> 0f
