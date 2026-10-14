@@ -64,6 +64,10 @@
 
     <!-- EhViewer favorites -->
     <string name="library_sync_step_ehviewer_favorites">EhViewer favorites</string>
+    <string name="library_sync_step_ehviewer_favorites_download">Downloading EhViewer favorites</string>
+    <string name="library_sync_step_ehviewer_favorites_read">Reading EhViewer favorites</string>
+    <string name="library_sync_progress_size">%1$s %2$s/%3$s MB (%4$d%%)</string>
+    <string name="library_sync_progress_size_unknown">%1$s %2$s MB</string>
     <string name="library_sync_ehviewer_favorites">Mark EhViewer favorites</string>
     <string name="library_sync_ehviewer_favorites_summary">Reads the favorites list the EhViewer fork uploads to the same OneDrive account and marks matching manga on covers in Browse and global search and on the details page: \"Local\" or \"Cloud: slot name\". E-Hentai sources match by gallery ID, other sources by title (brackets, tags, traditional/simplified Chinese and censored characters such as ○ are ignored).</string>
     <string name="ehviewer_favorite_local">Local</string>

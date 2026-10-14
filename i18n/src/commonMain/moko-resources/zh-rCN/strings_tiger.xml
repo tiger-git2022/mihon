@@ -54,6 +54,10 @@
 
     <!-- EhViewer 收藏 -->
     <string name="library_sync_step_ehviewer_favorites">EhViewer 收藏</string>
+    <string name="library_sync_step_ehviewer_favorites_download">下载 EhViewer 收藏</string>
+    <string name="library_sync_step_ehviewer_favorites_read">整理 EhViewer 收藏</string>
+    <string name="library_sync_progress_size">%1$s %2$s/%3$s MB（%4$d%%）</string>
+    <string name="library_sync_progress_size_unknown">%1$s %2$s MB</string>
     <string name="library_sync_ehviewer_favorites">标记 EhViewer 里收藏过的漫画</string>
     <string name="library_sync_ehviewer_favorites_summary">同步时读取 EhViewer 改版上传到同一个 OneDrive 账号的收藏清单，在浏览、全局搜索的封面和详情页标出“本地”或“云:收藏夹名”。E-Hentai 源按画廊 ID 匹配，其他源按标题匹配（忽略括号、标签、繁简差异和“催○”这类和谐字）。</string>
     <string name="ehviewer_favorite_local">本地</string>

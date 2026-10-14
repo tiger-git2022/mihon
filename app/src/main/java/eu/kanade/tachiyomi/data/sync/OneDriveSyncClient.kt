@@ -29,7 +29,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import okhttp3.ResponseBody
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.net.URLEncoder
@@ -156,7 +158,8 @@ class OneDriveSyncClient(
         }
     }
 
-    suspend fun readBytes(fileName: String): ByteArray? {
+    /** The bytes of [fileName], null if there is none; [onProgress] gets the bytes read and the size (-1 if unknown). */
+    suspend fun readBytes(fileName: String, onProgress: ((read: Long, size: Long) -> Unit)? = null): ByteArray? {
         val accessToken = acquireAccessToken()
         val request = Request.Builder()
             .url(fileUrl(fileName))
@@ -168,9 +171,28 @@ class OneDriveSyncClient(
             when {
                 response.code == 404 -> null
                 !response.isSuccessful -> throw response.toGraphException("download", fileName)
-                else -> response.body.bytes()
+                onProgress == null -> response.body.bytes()
+                else -> readWithProgress(response.body, onProgress)
             }
         }
+    }
+
+    private fun readWithProgress(body: ResponseBody, onProgress: (read: Long, size: Long) -> Unit): ByteArray {
+        val size = body.contentLength()
+        val out = ByteArrayOutputStream(if (size in 1..Int.MAX_VALUE) size.toInt() else DEFAULT_BUFFER_SIZE)
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE * 8)
+        var read = 0L
+        onProgress(0, size)
+        body.byteStream().use { input ->
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                out.write(buffer, 0, count)
+                read += count
+                onProgress(read, size)
+            }
+        }
+        return out.toByteArray()
     }
 
     /** ETag of [path] in the app folder, null if there is no such file. */

@@ -212,6 +212,8 @@ internal object EhTitleSimilarity {
 class EhFavoritesIndex(
     val file: EhFavoritesIndexFile,
     private val normalizer: EhTitleNormalizer,
+    /** Galleries read so far and their number while the index is built, for the sync progress. */
+    onProgress: ((done: Int, total: Int) -> Unit)? = null,
 ) {
     private class Key(val gallery: Int, val text: String)
 
@@ -220,7 +222,7 @@ class EhFavoritesIndex(
     /** Other spellings of the names in these favorites, built on first use (a global search finding nothing). */
     val aliases: EhNameAliases by lazy { EhNameAliases.build(galleries) }
     private val byGid = galleries.withIndex().associate { it.value.gid to it.index }
-    private val artists: List<Set<String>>
+    private val artists = ArrayList<Set<String>>(galleries.size)
     private val keys = ArrayList<Key>()
     private val bigramIndex = HashMap<Int, MutableList<Int>>()
     private val cache = object : LinkedHashMap<String, EhFavoriteMatch?>(CACHE_SIZE, 0.75f, true) {
@@ -228,17 +230,18 @@ class EhFavoritesIndex(
     }
 
     init {
-        artists = galleries.map { gallery ->
-            listOfNotNull(gallery.title, gallery.titleJpn).flatMapTo(HashSet()) { normalizer.artists(it) }
-        }
         galleries.forEachIndexed { index, gallery ->
-            val texts = listOfNotNull(gallery.title, gallery.titleJpn).flatMap { normalizer.keys(it) }.distinct()
+            val titles = listOfNotNull(gallery.title, gallery.titleJpn)
+            artists += titles.flatMapTo(HashSet()) { normalizer.artists(it) }
+            val texts = titles.flatMap { normalizer.keys(it) }.distinct()
             texts.filterNot(EhTitleSimilarity::mostlyWildcards).forEach { text ->
                 val keyIndex = keys.size
                 keys += Key(index, text)
                 bigrams(text).forEach { bigramIndex.getOrPut(it) { ArrayList() } += keyIndex }
             }
+            if (onProgress != null && (index + 1) % PROGRESS_STEP == 0) onProgress(index + 1, galleries.size)
         }
+        onProgress?.invoke(galleries.size, galleries.size)
     }
 
     val slotNames: List<String>
@@ -340,6 +343,7 @@ class EhFavoritesIndex(
         private const val MAX_CANDIDATES = 50
         private const val MAX_MATCHES = 5
         private const val CONTAINED_SCORE = 1_000
+        private const val PROGRESS_STEP = 500
 
         val EMPTY = EhFavoritesIndex(EhFavoritesIndexFile(), EhTitleNormalizer())
     }
