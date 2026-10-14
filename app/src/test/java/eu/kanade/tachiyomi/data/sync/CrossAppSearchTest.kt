@@ -19,6 +19,7 @@ class CrossAppSearchTest {
             "Kanojo no Himitsu",
             CrossAppSearch.coreTitle("[Circle B] Kanojo no Himitsu | Her Secret [English]"),
         )
+        assertEquals("Kanojo no Himitsu", CrossAppSearch.coreTitle("Kanojo no Himitsu|Her Secret [English]"))
         assertEquals("ドスケベシスターズの誘惑-背徳の聖女ハーレム-", CrossAppSearch.coreTitle("【デンジャラス・ラビット】ドスケベシスターズの誘惑-背徳の聖女ハーレム-（无修正）"))
         // Nothing but brackets: kept as it is
         assertEquals("[作者E]", CrossAppSearch.coreTitle("[作者E]"))
@@ -31,6 +32,8 @@ class CrossAppSearchTest {
         assertEquals("作者A", CrossAppSearch.artist("(C97) [サークルA (作者A)] 催眠性指導"))
         // A translator group first: the next group names the artist
         assertEquals("作者A", CrossAppSearch.artist("[脸肿汉化组] (C97) [サークルA (作者A)] 催眠性指導"))
+        assertEquals("作者A", CrossAppSearch.artist("[AI機翻] [サークルA (作者A)] 催眠性指導"))
+        assertEquals("作者A", CrossAppSearch.artist("[嵌字组] [サークルA (作者A)] 催眠性指導"))
         assertEquals("飞鸟", CrossAppSearch.artist("催眠性指導", listOf("飞鸟")))
         assertNull(CrossAppSearch.artist("催眠性指導"))
     }
