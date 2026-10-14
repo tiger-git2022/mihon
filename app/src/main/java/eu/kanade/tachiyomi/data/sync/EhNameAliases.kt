@@ -10,8 +10,11 @@ import java.text.Normalizer
  */
 class EhNameAliases private constructor(private val aliases: Map<String, String>) {
 
-    /** The other spelling of [query] (a whole artist, circle or title name), null if none is known. */
-    fun alternative(query: String): String? = aliases[key(query)]
+    /**
+     * The other spelling of [query], null if none is known: a whole artist, circle or title name, or a full title
+     * ("[Circle (Artist)] Title [Chinese]", as a manga page searches it) by its core.
+     */
+    fun alternative(query: String): String? = aliases[key(query)] ?: aliases[key(CrossAppSearch.coreTitle(query))]
 
     val size: Int
         get() = aliases.size
@@ -24,9 +27,10 @@ class EhNameAliases private constructor(private val aliases: Map<String, String>
         private val SPACES = Regex("""\s+""")
         private const val MIN_TITLE_LENGTH = 4
 
-        // A leading group naming translators or a language, as in CrossAppSearch
+        // A leading group naming translators or a language: Chinese markers anywhere, Latin words only as the whole
+        // group ("Digital Lover" is a circle) or as a translators' name ("Lazy Translations")
         private val NOT_ARTIST = Regex(
-            """汉化|漢化|翻訳|翻译|翻譯|中文|中国|中國|chinese|english|translat|個人|个人|机翻|機翻|嵌字|修正|dl版|digital""",
+            """汉化|漢化|翻訳|翻译|翻譯|中文|中国|中國|個人|个人|机翻|機翻|嵌字|修正|translations?\b|^\s*(?:chinese|english|digital|dl版)\s*$""",
             RegexOption.IGNORE_CASE,
         )
 

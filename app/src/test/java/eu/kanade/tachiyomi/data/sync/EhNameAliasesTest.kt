@@ -30,6 +30,13 @@ class EhNameAliasesTest {
             // Old index: no default title yet, both titles are the Japanese one
             gallery(5, "[ミルクレープ (チビゴン)] 同じ", "[ミルクレープ (チビゴン)] 同じ"),
             gallery(6, null, "[作者六] 六"),
+            // "Digital" in a circle name is no version marker
+            gallery(
+                7,
+                "[Digital Lover (Nakajima Yuka)] Seifuku Shokushu 10 [Chinese]",
+                "[Digital Lover (なかじまゆか)] 制服触手10 [中国翻訳]",
+            ),
+            gallery(8, "[Chinese] [Kotoba] Seven", "[中国翻訳] [ことば] 七"),
         ),
     )
 
@@ -40,6 +47,20 @@ class EhNameAliasesTest {
         assertEquals("チビゴン", aliases.alternative("  CHIBIGON "))
         assertEquals("Mille-Crepe", aliases.alternative("ミルクレープ"))
         assertEquals("むなしむじょう", aliases.alternative("Munashimujou"))
+    }
+
+    @Test
+    fun `translation markers are only whole groups`() {
+        assertEquals("なかじまゆか", aliases.alternative("Nakajima Yuka"))
+        assertEquals("ことば", aliases.alternative("Kotoba"))
+    }
+
+    @Test
+    fun `a full title is looked up by its core`() {
+        assertEquals(
+            "SNS de Uraaka Tokutei shita Hitozuma o Hamemakutta Hanashi.",
+            aliases.alternative("[ミルクレープ (チビゴン)] SNSで裏垢特定した人妻をハメまくった話。 [中国翻訳]"),
+        )
     }
 
     @Test
