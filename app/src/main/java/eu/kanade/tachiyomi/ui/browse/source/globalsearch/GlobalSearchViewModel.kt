@@ -9,6 +9,8 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactoryKey
 import eu.kanade.domain.source.service.SourcePreferences
+import eu.kanade.tachiyomi.data.sync.EhFavoritesStore
+import eu.kanade.tachiyomi.data.sync.KanaRomaji
 import eu.kanade.tachiyomi.data.sync.LibraryAutoSync
 import eu.kanade.tachiyomi.data.sync.LibrarySyncPreferences
 import eu.kanade.tachiyomi.data.sync.SearchHistoryEntry
@@ -36,6 +38,7 @@ class GlobalSearchViewModel(
     private val searchHistoryPreferences: GlobalSearchHistoryPreferences,
     private val librarySyncPreferences: LibrarySyncPreferences,
     private val libraryAutoSync: LibraryAutoSync,
+    private val ehFavoritesStore: EhFavoritesStore,
 ) : SearchViewModel(
     initialState = State(
         searchQuery = initialQuery,
@@ -96,6 +99,19 @@ class GlobalSearchViewModel(
         updateSearchQuery(query)
         updateSearchHistory { entries, device, now -> entries.withSearchQuery(query, device, now) }
         super.search()
+    }
+
+    // The other spelling of an artist, circle or title the EhViewer favorites list both ways, else the romanized
+    // kana of a name nobody favorited
+    override fun alternativeQuery(query: String): String? {
+        val alias = if (librarySyncPreferences.showEhViewerFavorites.get()) {
+            ehFavoritesStore.index.value.aliases.alternative(
+                query,
+            )
+        } else {
+            null
+        }
+        return alias ?: KanaRomaji.romanize(query)
     }
 
     fun removeSearchHistory(query: String) {

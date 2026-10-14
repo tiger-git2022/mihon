@@ -162,17 +162,29 @@ abstract class SearchViewModel(
                     }
 
                     try {
-                        val page = withContext(coroutineDispatcher) {
-                            source.getSearchManga(1, query, source.getFilterList())
+                        suspend fun searchSource(text: String): List<Manga> {
+                            val page = withContext(coroutineDispatcher) {
+                                source.getSearchManga(1, text, source.getFilterList())
+                            }
+
+                            return page.mangas
+                                .map { it.toDomainManga(source.id) }
+                                .distinctBy { it.url }
+                                .let { networkToLocalManga(it) }
                         }
 
-                        val titles = page.mangas
-                            .map { it.toDomainManga(source.id) }
-                            .distinctBy { it.url }
-                            .let { networkToLocalManga(it) }
+                        var titles = searchSource(query)
+                        // Fork: nothing found, the source may spell the name the other way ("Chibigon", "チビゴン")
+                        var foundAs: String? = null
+                        if (titles.isEmpty() && isActive) {
+                            alternativeQuery(query)?.let { alternative ->
+                                titles = searchSource(alternative)
+                                if (titles.isNotEmpty()) foundAs = alternative
+                            }
+                        }
 
                         if (isActive) {
-                            updateItem(source, SearchItemResult.Success(titles))
+                            updateItem(source, SearchItemResult.Success(titles, foundAs))
                         }
                     } catch (e: Exception) {
                         if (isActive) {
@@ -184,6 +196,9 @@ abstract class SearchViewModel(
                 .awaitAll()
         }
     }
+
+    /** Fork: another spelling of [query] to search a source with when it finds nothing, see EhNameAliases. */
+    protected open fun alternativeQuery(query: String): String? = null
 
     private fun updateItems(items: Map<Source, SearchItemResult>) {
         state.update {
@@ -248,6 +263,8 @@ sealed interface SearchItemResult {
 
     data class Success(
         val result: List<Manga>,
+        // Fork: the other spelling of the query that found these, see SearchViewModel.alternativeQuery
+        val foundAs: String? = null,
     ) : SearchItemResult {
         val isEmpty: Boolean
             get() = result.isEmpty()

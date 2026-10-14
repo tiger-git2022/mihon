@@ -216,6 +216,9 @@ class EhFavoritesIndex(
     private class Key(val gallery: Int, val text: String)
 
     private val galleries = file.galleries
+
+    /** Other spellings of the names in these favorites, built on first use (a global search finding nothing). */
+    val aliases: EhNameAliases by lazy { EhNameAliases.build(galleries) }
     private val byGid = galleries.withIndex().associate { it.value.gid to it.index }
     private val artists: List<Set<String>>
     private val keys = ArrayList<Key>()

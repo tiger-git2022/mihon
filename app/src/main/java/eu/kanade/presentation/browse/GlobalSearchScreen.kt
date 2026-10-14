@@ -18,7 +18,9 @@ import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SourceFilter
 import eu.kanade.tachiyomi.ui.library.LibrarySyncActions
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import tachiyomi.domain.manga.model.Manga
+import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.Scaffold
+import tachiyomi.presentation.core.i18n.stringResource
 
 @Composable
 fun GlobalSearchScreen(
@@ -96,7 +98,11 @@ internal fun GlobalSearchContent(
                     title = fromSourceId?.let {
                         "▶ ${source.name}".takeIf { source.id == fromSourceId }
                     } ?: source.name,
-                    subtitle = LocaleHelper.getLocalizedDisplayName(source.lang),
+                    subtitle = LocaleHelper.getLocalizedDisplayName(source.lang) +
+                        // Fork: searched again with the other spelling of the name
+                        (result as? SearchItemResult.Success)?.foundAs
+                            ?.let { " · " + stringResource(MR.strings.global_search_alternative_query, it) }
+                            .orEmpty(),
                     onClick = { onClickSource(source) },
                     modifier = Modifier.animateItem(),
                 ) {
