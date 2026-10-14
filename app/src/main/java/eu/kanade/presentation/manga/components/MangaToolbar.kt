@@ -37,6 +37,8 @@ fun MangaToolbar(
     onClickRefresh: () -> Unit,
     onClickMigrate: (() -> Unit)?,
     onClickEditNotes: () -> Unit,
+    // Fork: entries added to the menu, e.g. searching the manga in EhViewer
+    extraOverflowActions: List<AppBar.OverflowAction>,
 
     // For action mode
     actionModeCounter: Int,
@@ -146,6 +148,7 @@ fun MangaToolbar(
                             onClick = onClickEditNotes,
                         ),
                     )
+                    addAll(extraOverflowActions)
                 },
             )
         },
