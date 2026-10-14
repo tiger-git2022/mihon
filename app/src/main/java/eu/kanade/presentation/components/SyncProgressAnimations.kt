@@ -30,11 +30,14 @@ import androidx.compose.ui.unit.dp
 
 /*
  * Fork: progress of a running sync that shows it still works without moving the progress itself. The bar keeps its
- * length and a light sweeps over the done part; the ring keeps its arc, redrawn faintly from 0 now and then. With
- * animations turned off in the system settings, both stay still.
+ * length and a soft light sweeps over its done part every few seconds; the ring keeps its arc, redrawn faintly from 0
+ * every few seconds. With animations turned off in the system settings, both stay still.
  */
 
-private const val SHIMMER_MILLIS = 1_250
+// One sweep and a pause; the light is soft so the bar does not draw the eye
+private const val SHIMMER_MILLIS = 2_400
+private const val SHIMMER_SWEEP = 2f / 3
+private const val SHIMMER_ALPHA = 0.25f
 private const val REDRAW_MILLIS = 3_200
 
 /** A bar [progress] long whose done part a light sweeps over. */
@@ -55,13 +58,16 @@ fun ShimmerLinearProgress(
         clipPath(Path().apply { addRoundRect(RoundRect(0f, 0f, done, size.height, radius)) }) {
             drawRect(color = color, size = Size(done, size.height))
             val t = sweep?.value ?: return@clipPath
-            // A band 45% as long as the done part, from before its start to past its end
-            val band = done * 0.45f
-            val start = -band + t * (done + band * 2)
+            if (t > SHIMMER_SWEEP) return@clipPath
+            // A band half as long as the done part, from before its start to past its end, eased in and out
+            val band = done * 0.5f
+            val start = -band + FastOutSlowInEasing.transform(t / SHIMMER_SWEEP) * (done + band)
             drawRect(
                 brush = Brush.horizontalGradient(
                     0f to Color.Transparent,
-                    0.5f to Color.White.copy(alpha = 0.45f),
+                    0.35f to Color.White.copy(alpha = SHIMMER_ALPHA * 0.6f),
+                    0.5f to Color.White.copy(alpha = SHIMMER_ALPHA),
+                    0.65f to Color.White.copy(alpha = SHIMMER_ALPHA * 0.6f),
                     1f to Color.Transparent,
                     startX = start,
                     endX = start + band,
