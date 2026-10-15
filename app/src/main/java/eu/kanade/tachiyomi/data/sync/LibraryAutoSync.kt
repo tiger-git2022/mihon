@@ -168,6 +168,10 @@ class LibraryAutoSync(
         }
         if (launchSync && isAllowed) {
             scope.launch { syncNowOrLater(fromChange = false) }
+        } else if (service.changesPending.value) {
+            // Fork: changes handed to WorkManager in the background count down here again. Android may hold that
+            // work back for long, while the sync action shows the changes as waiting.
+            notifyChanged()
         }
     }
 
