@@ -27,12 +27,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import eu.kanade.presentation.components.SyncRingProgressIndicator
 import eu.kanade.presentation.more.settings.Preference
+import eu.kanade.tachiyomi.data.sync.LibraryManualSyncWorker
 import eu.kanade.tachiyomi.data.sync.LibrarySyncPreferences
 import eu.kanade.tachiyomi.data.sync.SettingsBackup
-import eu.kanade.tachiyomi.ui.library.librarySyncMessage
 import eu.kanade.tachiyomi.ui.library.librarySyncProgressText
 import eu.kanade.tachiyomi.util.system.toast
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -63,6 +62,8 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
     val autoSync by preferences.autoSync.collectAsState()
     val activity = remember(context) { context.findActivity() }
     var isBusy by remember { mutableStateOf(false) }
+    // No signing out or second start while a manual sync is queued or runs, also after the settings were reopened
+    val manualSyncRunning by service.manualSyncRunning.collectAsStateWithLifecycle()
     // Also shows a sync started from the library toolbar
     val syncProgress by service.progress.collectAsStateWithLifecycle()
 
@@ -97,7 +98,7 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
 
     // TextPreference has no "enabled" flag, so a null click handler disables the item.
     fun action(block: suspend () -> Unit): (() -> Unit)? {
-        if (isBusy) return null
+        if (isBusy || manualSyncRunning) return null
         return {
             isBusy = true
             scope.launch {
@@ -143,7 +144,7 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
                     Preference.PreferenceItem.TextPreference(
                         title = when {
                             syncProgress != null -> librarySyncProgressText(syncProgress!!)
-                            isBusy -> stringResource(MR.strings.library_sync_syncing)
+                            isBusy || manualSyncRunning -> stringResource(MR.strings.library_sync_syncing)
                             else -> stringResource(MR.strings.library_sync_now)
                         },
                         widget = if (syncProgress != null) {
@@ -155,19 +156,9 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
                             null
                         } else {
                             action {
-                                // Fork: the sync goes on after the settings close, only the wait for it ends there
-                                runCatching { service.syncManually() }.onSuccess { result ->
-                                    context.toast(context.librarySyncMessage(result))
-                                }.onFailure { error ->
-                                    if (error is CancellationException) throw error
-                                    logcat(LogPriority.ERROR, error)
-                                    context.toast(
-                                        context.stringResource(
-                                            MR.strings.library_sync_failed,
-                                            error.message.orEmpty(),
-                                        ),
-                                    )
-                                }
+                                // Runs as WorkManager work with a notification, so it goes on in the background; the
+                                // worker shows the result
+                                LibraryManualSyncWorker.start(context)
                             }
                         },
                     ),
@@ -176,7 +167,11 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
                     Preference.PreferenceItem.TextPreference(
                         title = stringResource(MR.strings.library_sync_restore_settings),
                         subtitle = stringResource(MR.strings.library_sync_restore_settings_summary),
-                        onClick = if (isBusy) null else ({ restoreDialog = RestoreDialog.Loading }),
+                        onClick = if (isBusy || manualSyncRunning) {
+                            null
+                        } else {
+                            { restoreDialog = RestoreDialog.Loading }
+                        },
                     ),
                 )
                 add(

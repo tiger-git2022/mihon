@@ -7,10 +7,6 @@ import dev.zacsweers.metro.SingleIn
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.GlobalSearchHistoryPreferences
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SearchHistoryState
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -43,9 +39,6 @@ class LibrarySyncService(
     private val settingsBackupSync: SettingsBackupSync,
 ) {
     private val syncMutex = Mutex()
-
-    // Fork: manual syncs run here, not in the screen that started them, see syncManually
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _progress = MutableStateFlow<LibrarySyncProgress?>(null)
 
@@ -104,11 +97,17 @@ class LibrarySyncService(
      */
     suspend fun sync(): LibrarySyncResult = checkNotNull(syncIf(manual = true) { true })
 
+    private val _manualSyncRunning = MutableStateFlow(false)
+
     /**
-     * [sync] asked from a screen, run in the service's own scope: leaving the screen cancels only the wait for the
-     * result, the sync itself goes on.
+     * True from the tap on sync until [LibraryManualSyncWorker] has finished that sync, which runs as WorkManager work
+     * so that it goes on in the background.
      */
-    suspend fun syncManually(): LibrarySyncResult = scope.async { sync() }.await()
+    val manualSyncRunning: StateFlow<Boolean> = _manualSyncRunning.asStateFlow()
+
+    internal fun setManualSyncRunning(running: Boolean) {
+        _manualSyncRunning.value = running
+    }
 
     /**
      * [sync], unless [canStart] returns false once the previous sync has finished. Automatic syncs check their
