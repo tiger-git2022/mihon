@@ -471,10 +471,6 @@ class LibrarySyncWorker(context: Context, workerParams: WorkerParameters) : Coro
 }
 
 /**
- * Debounce of change triggered syncs: every change restarts a 60 s countdown, and a batch waits at most 5 min from
- * its first change.
- */
-/**
  * A running countdown of a change triggered sync, in [SystemClock.elapsedRealtime] time: the sync comes at [dueAt], a
  * minute after the last change, and at the latest at [batchEndsAt], five minutes after the first.
  */
@@ -486,6 +482,10 @@ data class ChangeSyncCountdown(val dueAt: Long, val batchEndsAt: Long) {
     fun batchLeft(now: Long) = ((batchEndsAt - now).toFloat() / ChangeSyncDebounce.MAX_WAIT_MILLIS).coerceIn(0f, 1f)
 }
 
+/**
+ * Debounce of change triggered syncs: every change restarts a 60 s countdown, and a batch waits at most 5 min from
+ * its first change.
+ */
 internal object ChangeSyncDebounce {
     const val DEBOUNCE_MILLIS = 60_000L
     const val MAX_WAIT_MILLIS = 5 * 60_000L
