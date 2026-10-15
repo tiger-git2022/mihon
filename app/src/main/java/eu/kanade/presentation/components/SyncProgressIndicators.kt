@@ -41,7 +41,7 @@ fun SyncRingProgressIndicator(
     color: Color,
     modifier: Modifier = Modifier,
     size: Dp = 22.dp,
-    strokeWidth: Dp = 2.5.dp,
+    strokeWidth: Dp = syncAnimationStyle().ringStroke,
 ) {
     if (fraction != null && fraction > 0f) {
         val animated by animateFloatAsState(
@@ -49,7 +49,7 @@ fun SyncRingProgressIndicator(
             ProgressIndicatorDefaults.ProgressAnimationSpec,
             label = "syncRing",
         )
-        // The done arc is redrawn faintly now and then, see SoftRedrawRingProgress
+        // The done arc is redrawn now and then, see SoftRedrawRingProgress
         SoftRedrawRingProgress(progress = {
             animated
         }, color = color, modifier = modifier.size(size), strokeWidth = strokeWidth)
