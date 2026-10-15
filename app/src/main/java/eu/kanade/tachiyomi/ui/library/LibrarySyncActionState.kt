@@ -14,6 +14,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.AppBarActions
+import eu.kanade.presentation.components.SyncCountdownIcon
 import eu.kanade.tachiyomi.data.sync.EhFavoritesSyncStage
 import eu.kanade.tachiyomi.data.sync.LibraryManualSyncWorker
 import eu.kanade.tachiyomi.data.sync.LibrarySyncProgress
@@ -67,6 +68,8 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
 
     val librarySyncPreferences = remember { context.appGraph.librarySyncPreferences }
     val librarySyncService = remember { context.appGraph.librarySyncService }
+    val libraryAutoSync = remember { context.appGraph.libraryAutoSync }
+    val countdown by libraryAutoSync.countdown.collectAsStateWithLifecycle()
     val accountName by librarySyncPreferences.accountName.collectAsState()
     val manualSyncRunning by librarySyncService.manualSyncRunning.collectAsStateWithLifecycle()
     val manualSyncQueued by remember { LibraryManualSyncWorker.isQueued(context) }
@@ -129,6 +132,8 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
         onClick = onClick,
         isLoading = syncing,
         progress = fraction,
+        // With a countdown, how long the changes still wait
+        iconContent = countdown?.takeIf { state == LibrarySyncState.PENDING }?.let { c -> { SyncCountdownIcon(c) } },
     )
 
     return LibrarySyncActionState(
