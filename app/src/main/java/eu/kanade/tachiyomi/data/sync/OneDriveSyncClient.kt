@@ -34,6 +34,7 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
+import java.io.OutputStream
 import java.net.URLEncoder
 import java.security.MessageDigest
 import kotlin.coroutines.resume
@@ -177,21 +178,59 @@ class OneDriveSyncClient(
         }
     }
 
-    private fun readWithProgress(body: ResponseBody, onProgress: (read: Long, size: Long) -> Unit): ByteArray {
-        val size = body.contentLength()
-        val out = ByteArrayOutputStream(if (size in 1..Int.MAX_VALUE) size.toInt() else DEFAULT_BUFFER_SIZE)
+    /**
+     * Streams [fileName] into [target], replacing it; false if there is no such file. [onProgress] gets the bytes read
+     * and the size (-1 if unknown).
+     */
+    suspend fun downloadTo(
+        fileName: String,
+        target: File,
+        onProgress: ((read: Long, size: Long) -> Unit)? = null,
+    ): Boolean {
+        val accessToken = acquireAccessToken()
+        val request = Request.Builder()
+            .url(fileUrl(fileName))
+            .header("Authorization", "Bearer $accessToken")
+            .get()
+            .build()
+
+        return httpClient.newCall(request).await().use { response ->
+            when {
+                response.code == 404 -> false
+                !response.isSuccessful -> throw response.toGraphException("download", fileName)
+                else -> {
+                    val size = response.body.contentLength()
+                    target.outputStream().use { output -> copy(response.body, output, size, onProgress) }
+                    true
+                }
+            }
+        }
+    }
+
+    private fun copy(
+        body: ResponseBody,
+        output: OutputStream,
+        size: Long,
+        onProgress: ((read: Long, size: Long) -> Unit)?,
+    ) {
         val buffer = ByteArray(DEFAULT_BUFFER_SIZE * 8)
         var read = 0L
-        onProgress(0, size)
+        onProgress?.invoke(0, size)
         body.byteStream().use { input ->
             while (true) {
                 val count = input.read(buffer)
                 if (count < 0) break
-                out.write(buffer, 0, count)
+                output.write(buffer, 0, count)
                 read += count
-                onProgress(read, size)
+                onProgress?.invoke(read, size)
             }
         }
+    }
+
+    private fun readWithProgress(body: ResponseBody, onProgress: (read: Long, size: Long) -> Unit): ByteArray {
+        val size = body.contentLength()
+        val out = ByteArrayOutputStream(if (size in 1..Int.MAX_VALUE) size.toInt() else DEFAULT_BUFFER_SIZE)
+        copy(body, out, size, onProgress)
         return out.toByteArray()
     }
 

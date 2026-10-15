@@ -45,6 +45,13 @@ class LibrarySyncService(
     /** Progress of the running sync, null when no sync runs. */
     val progress: StateFlow<LibrarySyncProgress?> = _progress.asStateFlow()
 
+    // At most once a second within a step and phase: every change redraws the library
+    private val progressThrottle = ProgressThrottle<LibrarySyncProgress>(
+        samePart = LibrarySyncProgress::isSamePart,
+        isFinal = { it.total > 0 && it.done >= it.total },
+        publish = { _progress.value = it },
+    )
+
     private val _finished = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     /** Emits after every sync, successful or not. */
@@ -113,7 +120,7 @@ class LibrarySyncService(
             recordResult(failed = true)
             throw e
         } finally {
-            _progress.value = null
+            progressThrottle.update(null)
         }
     }
 
@@ -123,7 +130,7 @@ class LibrarySyncService(
     }
 
     private suspend fun syncSteps(manual: Boolean): LibrarySyncResult {
-        _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.LIBRARY)
+        progressThrottle.update(LibrarySyncProgress(LibrarySyncProgress.Step.LIBRARY))
         val account = oneDriveSyncClient.currentAccount()
             ?: throw LibrarySyncException("Sign in to OneDrive before syncing")
         updateAccount(account)
@@ -136,7 +143,9 @@ class LibrarySyncService(
             if (manual) {
                 runStep(LibrarySyncProgress.Step.SETTINGS_BACKUP) {
                     settingsBackupSync.upload(device) { stage ->
-                        _progress.value = LibrarySyncProgress(LibrarySyncProgress.Step.SETTINGS_BACKUP, stage = stage)
+                        progressThrottle.update(
+                            LibrarySyncProgress(LibrarySyncProgress.Step.SETTINGS_BACKUP, stage = stage),
+                        )
                     }
                 }
             } else {
@@ -144,11 +153,13 @@ class LibrarySyncService(
             },
             runStep(LibrarySyncProgress.Step.EHVIEWER_FAVORITES) {
                 ehFavoritesStore.sync { stage, done, total ->
-                    _progress.value = LibrarySyncProgress(
-                        LibrarySyncProgress.Step.EHVIEWER_FAVORITES,
-                        done = done.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-                        total = total.coerceIn(0, Int.MAX_VALUE.toLong()).toInt(),
-                        favoritesStage = stage,
+                    progressThrottle.update(
+                        LibrarySyncProgress(
+                            LibrarySyncProgress.Step.EHVIEWER_FAVORITES,
+                            done = done.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                            total = total.coerceIn(0, Int.MAX_VALUE.toLong()).toInt(),
+                            favoritesStage = stage,
+                        ),
                     )
                 }
             },
@@ -230,7 +241,7 @@ class LibrarySyncService(
     /** Runs a secondary sync step; returns its error message instead of failing the whole sync. */
     private suspend fun runStep(progressStep: LibrarySyncProgress.Step, step: suspend () -> Unit): String? {
         return try {
-            _progress.value = LibrarySyncProgress(progressStep)
+            progressThrottle.update(LibrarySyncProgress(progressStep))
             step()
             null
         } catch (e: CancellationException) {
@@ -243,8 +254,8 @@ class LibrarySyncService(
 
     /** Shows [phase] of the current step, see [LibrarySyncProgress.phase]. */
     private fun phase(phase: LibrarySyncProgress.Phase, done: Int = 0, total: Int = 0) {
-        val step = _progress.value?.step ?: return
-        _progress.value = LibrarySyncProgress(step, done, total, phase = phase)
+        val step = progressThrottle.latest?.step ?: return
+        progressThrottle.update(LibrarySyncProgress(step, done, total, phase = phase))
     }
 
     private suspend fun syncLibrary(): LibrarySyncResult {
@@ -438,6 +449,10 @@ data class LibrarySyncProgress(
         SETTINGS_BACKUP(4),
         EHVIEWER_FAVORITES(5),
     }
+
+    /** Whether [other] shows the same part of the sync, only further along. */
+    fun isSamePart(other: LibrarySyncProgress): Boolean =
+        step == other.step && phase == other.phase && stage == other.stage && favoritesStage == other.favoritesStage
 
     val percent: Int?
         // In Long: bytes of a download over 20 MB times 100 overflow an Int

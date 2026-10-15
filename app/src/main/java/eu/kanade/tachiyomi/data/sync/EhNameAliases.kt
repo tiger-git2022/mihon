@@ -34,7 +34,7 @@ class EhNameAliases private constructor(private val aliases: Map<String, String>
             RegexOption.IGNORE_CASE,
         )
 
-        fun build(galleries: List<EhIndexedGallery>): EhNameAliases {
+        fun build(galleries: Iterable<EhIndexedGallery>): EhNameAliases {
             // name -> other spelling -> galleries giving that pair; the spelling most galleries agree on wins
             val votes = HashMap<String, HashMap<String, Int>>()
             fun vote(a: String?, b: String?) {

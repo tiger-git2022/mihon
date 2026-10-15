@@ -29,17 +29,17 @@ class EhFavoritesIndexTest {
     private val normalizer =
         EhTitleNormalizer { text -> text.replace('體', '体').replace('關', '关').replace('係', '系').replace('導', '导') }
 
-    private val index = EhFavoritesIndex(
-        EhFavoritesIndexFile(
-            version = 1,
-            slotNames = List(10) { "Slot $it" },
-            galleries = listOf(saimin, bilingual, volumeOne, short, traditional),
-        ),
-        normalizer,
-    )
+    private val galleries = listOf(saimin, bilingual, volumeOne, short, traditional)
+    private val index = EhFavoritesTestIndexes.oneShard(galleries, normalizer, slotNames = List(10) { "Slot $it" })
 
-    private fun gids(title: String, url: String = "/manga/1", authors: List<String> = emptyList()) =
-        index.find(url, title, authors)?.galleries?.map { it.gid }
+    // The same favorites, each in a shard of its own
+    private val sharded = EhFavoritesTestIndexes.shardPerGallery(galleries, normalizer)
+
+    private fun gids(title: String, url: String = "/manga/1", authors: List<String> = emptyList()): List<Long>? {
+        val gids = index.find(url, title, authors)?.galleries?.map { it.gid }
+        assertEquals(gids, sharded.find(url, title, authors)?.galleries?.map { it.gid })
+        return gids
+    }
 
     @Test
     fun `gallery id of E-Hentai sources wins`() {
@@ -48,6 +48,20 @@ class EhFavoritesIndexTest {
         assertTrue(match!!.byGalleryId)
         assertTrue(match.local)
         assertEquals(listOf(3), match.slots)
+        assertEquals(listOf(300L), sharded.find("/g/300/0123456789/", "anything")?.galleries?.map { it.gid })
+        assertNull(sharded.find("/g/301/0123456789/", "催眠アプリ"))
+        assertNull(sharded.find("/g/1/0123456789/", "催眠アプリ"))
+    }
+
+    @Test
+    fun `known results are cached`() {
+        assertNull(index.cached("/manga/2", "催眠性指導"))
+        assertEquals(listOf(100L), index.find("/manga/2", "催眠性指導")?.galleries?.map { it.gid })
+        assertEquals(listOf(100L), index.cached("/manga/2", "催眠性指導")?.match?.galleries?.map { it.gid })
+        index.find("/manga/3", "Completely Different Story")
+        val unmatched = index.cached("/manga/3", "Completely Different Story")
+        assertTrue(unmatched != null && unmatched.match == null)
+        assertTrue(EhFavoritesIndex.EMPTY.cached("/manga/1", "催眠性指導")?.match == null)
     }
 
     @Test

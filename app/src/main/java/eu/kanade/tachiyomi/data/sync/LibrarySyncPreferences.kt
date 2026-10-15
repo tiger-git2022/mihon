@@ -49,6 +49,7 @@ class LibrarySyncPreferences(
         true,
     )
 
+    /** ETag of the EhViewer favorites manifest read last, see EhFavoritesManifest. */
     val ehViewerFavoritesETag = preferenceStore.getString(
         Preference.appStateKey("library_sync_ehviewer_favorites_etag"),
         "",
