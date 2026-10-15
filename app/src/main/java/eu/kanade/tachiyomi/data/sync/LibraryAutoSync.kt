@@ -29,6 +29,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -75,6 +78,11 @@ class LibraryAutoSync(
 
     /** A change arrived while a sync ran; it is synced after it. */
     private var pendingAfterSync = false
+
+    private val _countdown = MutableStateFlow<ChangeSyncCountdown?>(null)
+
+    /** The running countdown of a change triggered sync, null while none runs. */
+    val countdown: StateFlow<ChangeSyncCountdown?> = _countdown.asStateFlow()
 
     /** Foreground syncs running now, and how many of them do not only sync changes. */
     private var foregroundSyncs = 0
@@ -185,6 +193,7 @@ class LibraryAutoSync(
             debounceJob = null
             batchStartedAt = 0L
             pendingAfterSync = false
+            _countdown.value = null
             if (pending && isChangeSyncAllowed) {
                 enqueueCatchUpWork(fromChange = true)
                 return
@@ -214,12 +223,14 @@ class LibraryAutoSync(
             val now = SystemClock.elapsedRealtime()
             if (batchStartedAt == 0L) batchStartedAt = now
             val wait = ChangeSyncDebounce.delayMillis(now, batchStartedAt)
+            _countdown.value = ChangeSyncCountdown(now + wait, batchStartedAt + ChangeSyncDebounce.MAX_WAIT_MILLIS)
             debounceJob?.cancel()
             debounceJob = scope.launch {
                 delay(wait)
                 synchronized(lock) {
                     debounceJob = null
                     batchStartedAt = 0L
+                    _countdown.value = null
                 }
                 // The options may have been turned off during the countdown
                 if (!isChangeSyncAllowed) return@launch
@@ -463,6 +474,18 @@ class LibrarySyncWorker(context: Context, workerParams: WorkerParameters) : Coro
  * Debounce of change triggered syncs: every change restarts a 60 s countdown, and a batch waits at most 5 min from
  * its first change.
  */
+/**
+ * A running countdown of a change triggered sync, in [SystemClock.elapsedRealtime] time: the sync comes at [dueAt], a
+ * minute after the last change, and at the latest at [batchEndsAt], five minutes after the first.
+ */
+data class ChangeSyncCountdown(val dueAt: Long, val batchEndsAt: Long) {
+    /** Left of the minute after the last change, from 1 to 0. */
+    fun minuteLeft(now: Long) = ((dueAt - now).toFloat() / ChangeSyncDebounce.DEBOUNCE_MILLIS).coerceIn(0f, 1f)
+
+    /** Left of the five minutes the changes wait at most, from 1 to 0. */
+    fun batchLeft(now: Long) = ((batchEndsAt - now).toFloat() / ChangeSyncDebounce.MAX_WAIT_MILLIS).coerceIn(0f, 1f)
+}
+
 internal object ChangeSyncDebounce {
     const val DEBOUNCE_MILLIS = 60_000L
     const val MAX_WAIT_MILLIS = 5 * 60_000L

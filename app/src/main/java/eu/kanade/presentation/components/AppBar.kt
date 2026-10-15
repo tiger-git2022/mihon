@@ -228,11 +228,17 @@ fun AppBarActions(
                         strokeWidth = 2.dp,
                     )
                 } else {
-                    Icon(
-                        imageVector = it.icon,
-                        tint = it.iconTint ?: LocalContentColor.current,
-                        contentDescription = it.title,
-                    )
+                    // Fork: a drawn icon, see Action.iconContent
+                    val content = it.iconContent
+                    if (content != null) {
+                        content()
+                    } else {
+                        Icon(
+                            imageVector = it.icon,
+                            tint = it.iconTint ?: LocalContentColor.current,
+                            contentDescription = it.title,
+                        )
+                    }
                 }
             }
         }
@@ -462,6 +468,8 @@ sealed interface AppBar {
         val isLoading: Boolean = false,
         /** Fork: progress from 0 to 1 shown while [isLoading], an endless spinner when null. */
         val progress: Float? = null,
+        /** Fork: drawn instead of [icon] when set, e.g. the countdown of the sync action. */
+        val iconContent: (@Composable () -> Unit)? = null,
     ) : AppBarAction
 
     data class OverflowAction(
