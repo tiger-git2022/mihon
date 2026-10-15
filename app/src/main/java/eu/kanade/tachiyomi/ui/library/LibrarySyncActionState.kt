@@ -171,8 +171,8 @@ internal fun Context.librarySyncMessage(result: LibrarySyncResult): String {
     return result.warning?.let { stringResource(MR.strings.library_sync_partial_failure, message, it) } ?: message
 }
 
-/** A progress line in two parts: [label] cut short when the line is too long, [numbers] always shown in full. */
-data class LibrarySyncProgressLine(val label: String, val numbers: String)
+/** A progress line, [full] where it fits (a tablet), else in two parts: [label] cut short, [numbers] always whole. */
+data class LibrarySyncProgressLine(val label: String, val numbers: String, val full: String)
 
 /** "5/5 Downloading EhViewer favorites" and "1.2/3.4 MB  80%". */
 @Composable
@@ -187,6 +187,7 @@ internal fun librarySyncProgressLine(progress: LibrarySyncProgress): LibrarySync
     return LibrarySyncProgressLine(
         label = "${progress.step.number}/${LibrarySyncProgress.STEP_COUNT} ${librarySyncStepName(progress)}",
         numbers = listOfNotNull(count, "${(progress.fraction * 100).toInt()}%").joinToString("  "),
+        full = librarySyncProgressText(progress),
     )
 }
 
