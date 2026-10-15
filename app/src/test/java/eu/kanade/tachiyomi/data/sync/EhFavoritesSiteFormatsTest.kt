@@ -43,17 +43,15 @@ class EhFavoritesSiteFormatsTest {
         text.replace('導', '导').replace('島', '岛').replace('宮', '宫').replace('場', '场')
     }
 
-    private val index = EhFavoritesIndex(
-        EhFavoritesIndexFile(version = 1, galleries = listOf(saimin, himitsu, app, promise, homework)),
-        normalizer,
-    )
+    private val galleries = listOf(saimin, himitsu, app, promise, homework)
+    private val index = EhFavoritesTestIndexes.oneShard(galleries, normalizer)
+    private val sharded = EhFavoritesTestIndexes.shardPerGallery(galleries, normalizer)
 
-    private fun match(title: String, vararg authors: String) = index.find(
-        "/comic/1",
-        title,
-        authors.toList(),
-    )?.galleries?.map {
-        it.gid
+    private fun match(title: String, vararg authors: String): List<Long>? {
+        val gids = index.find("/comic/1", title, authors.toList())?.galleries?.map { it.gid }
+        // Split into shards, the favorites match the same
+        assertEquals(gids, sharded.find("/comic/1", title, authors.toList())?.galleries?.map { it.gid })
+        return gids
     }
 
     @Test
