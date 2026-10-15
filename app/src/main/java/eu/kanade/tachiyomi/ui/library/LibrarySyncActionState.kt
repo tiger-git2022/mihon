@@ -23,9 +23,8 @@ import eu.kanade.tachiyomi.data.sync.LibrarySyncResult
 import eu.kanade.tachiyomi.data.sync.SettingsBackupStage
 import eu.kanade.tachiyomi.ui.setting.SettingsScreen
 import eu.kanade.tachiyomi.util.system.toast
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import mihon.app.di.appGraph
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.rounded.DoneAll
@@ -57,6 +56,8 @@ class LibrarySyncActionState(
     val onClick: () -> Unit,
     /** Current sync step and progress, e.g. "Syncing 6% (1/5): Library 37/120 (30%)". */
     val progressText: String?,
+    /** [progressText] in two parts for the bar below the library toolbar, see [LibrarySyncProgressLine]. */
+    val progressLine: LibrarySyncProgressLine?,
     /** Progress of the whole sync from 0 to 1, null when no sync runs. */
     val progress: Float?,
     /** The toolbar action showing [state]. */
@@ -75,6 +76,7 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
     var isSyncing by remember { mutableStateOf(false) }
     val progress by librarySyncService.progress.collectAsStateWithLifecycle()
     val progressText = progress?.let { librarySyncProgressText(it) }
+    val progressLine = progress?.let { librarySyncProgressLine(it) }
     val changesPending by librarySyncService.changesPending.collectAsStateWithLifecycle()
     val lastSyncTime by librarySyncPreferences.lastSyncTime.collectAsState()
     val lastSyncFailed by librarySyncPreferences.lastSyncFailed.collectAsState()
@@ -106,11 +108,11 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
 
         isSyncing = true
         scope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) { librarySyncService.sync() }
-            }.onSuccess { result ->
+            // The sync goes on after this screen leaves, only the wait for it ends there
+            runCatching { librarySyncService.syncManually() }.onSuccess { result ->
                 context.toast(context.librarySyncMessage(result))
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 Log.e("LibrarySync", "Library sync failed", error)
                 context.toast(
                     context.stringResource(
@@ -151,6 +153,7 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
         isSyncing = syncing,
         onClick = onClick,
         progressText = progressText,
+        progressLine = progressLine,
         progress = fraction,
         action = action,
     )
@@ -168,30 +171,28 @@ internal fun Context.librarySyncMessage(result: LibrarySyncResult): String {
     return result.warning?.let { stringResource(MR.strings.library_sync_partial_failure, message, it) } ?: message
 }
 
+/** A progress line in two parts: [label] cut short when the line is too long, [numbers] always shown in full. */
+data class LibrarySyncProgressLine(val label: String, val numbers: String)
+
+/** "5/5 Downloading EhViewer favorites" and "1.2/3.4 MB  80%". */
+@Composable
+internal fun librarySyncProgressLine(progress: LibrarySyncProgress): LibrarySyncProgressLine {
+    val count = when {
+        progress.favoritesStage == EhFavoritesSyncStage.DOWNLOAD && progress.total > 0 ->
+            "${mb(progress.done)}/${mb(progress.total)} MB"
+        progress.favoritesStage == EhFavoritesSyncStage.DOWNLOAD && progress.done > 0 -> "${mb(progress.done)} MB"
+        progress.total > 0 -> "${progress.done}/${progress.total}"
+        else -> null
+    }
+    return LibrarySyncProgressLine(
+        label = "${progress.step.number}/${LibrarySyncProgress.STEP_COUNT} ${librarySyncStepName(progress)}",
+        numbers = listOfNotNull(count, "${(progress.fraction * 100).toInt()}%").joinToString("  "),
+    )
+}
+
 @Composable
 internal fun librarySyncProgressText(progress: LibrarySyncProgress): String {
-    val baseName = when (progress.step) {
-        LibrarySyncProgress.Step.LIBRARY -> stringResource(MR.strings.library_sync_step_library)
-        LibrarySyncProgress.Step.SEARCH_HISTORY -> stringResource(MR.strings.library_sync_step_search_history)
-        LibrarySyncProgress.Step.MARKS -> stringResource(MR.strings.library_sync_step_marks)
-        LibrarySyncProgress.Step.EHVIEWER_FAVORITES -> when (progress.favoritesStage) {
-            EhFavoritesSyncStage.DOWNLOAD -> stringResource(MR.strings.library_sync_step_ehviewer_favorites_download)
-            EhFavoritesSyncStage.READ -> stringResource(MR.strings.library_sync_step_ehviewer_favorites_read)
-            null -> stringResource(MR.strings.library_sync_step_ehviewer_favorites)
-        }
-        LibrarySyncProgress.Step.SETTINGS_BACKUP -> when (progress.stage) {
-            SettingsBackupStage.UPLOAD -> stringResource(MR.strings.library_sync_step_settings_upload)
-            else -> stringResource(MR.strings.library_sync_step_settings_create)
-        }
-    }
-    // "Library · comparing"
-    val stepName = when (progress.phase) {
-        LibrarySyncProgress.Phase.DOWNLOAD -> stringResource(MR.strings.library_sync_phase_download)
-        LibrarySyncProgress.Phase.COMPARE -> stringResource(MR.strings.library_sync_phase_compare)
-        LibrarySyncProgress.Phase.UPLOAD -> stringResource(MR.strings.library_sync_phase_upload)
-        LibrarySyncProgress.Phase.APPLY -> stringResource(MR.strings.library_sync_phase_apply)
-        null -> null
-    }?.let { stringResource(MR.strings.library_sync_step_phase, baseName, it) } ?: baseName
+    val stepName = librarySyncStepName(progress)
     val detail = when {
         // Bytes as megabytes: "Downloading EhViewer favorites 1.2/3.4 MB (35%)"
         progress.favoritesStage == EhFavoritesSyncStage.DOWNLOAD ->
@@ -220,6 +221,32 @@ internal fun librarySyncProgressText(progress: LibrarySyncProgress): String {
         LibrarySyncProgress.STEP_COUNT,
         detail,
     )
+}
+
+/** The step and its part, "Library · comparing". */
+@Composable
+private fun librarySyncStepName(progress: LibrarySyncProgress): String {
+    val baseName = when (progress.step) {
+        LibrarySyncProgress.Step.LIBRARY -> stringResource(MR.strings.library_sync_step_library)
+        LibrarySyncProgress.Step.SEARCH_HISTORY -> stringResource(MR.strings.library_sync_step_search_history)
+        LibrarySyncProgress.Step.MARKS -> stringResource(MR.strings.library_sync_step_marks)
+        LibrarySyncProgress.Step.EHVIEWER_FAVORITES -> when (progress.favoritesStage) {
+            EhFavoritesSyncStage.DOWNLOAD -> stringResource(MR.strings.library_sync_step_ehviewer_favorites_download)
+            EhFavoritesSyncStage.READ -> stringResource(MR.strings.library_sync_step_ehviewer_favorites_read)
+            null -> stringResource(MR.strings.library_sync_step_ehviewer_favorites)
+        }
+        LibrarySyncProgress.Step.SETTINGS_BACKUP -> when (progress.stage) {
+            SettingsBackupStage.UPLOAD -> stringResource(MR.strings.library_sync_step_settings_upload)
+            else -> stringResource(MR.strings.library_sync_step_settings_create)
+        }
+    }
+    return when (progress.phase) {
+        LibrarySyncProgress.Phase.DOWNLOAD -> stringResource(MR.strings.library_sync_phase_download)
+        LibrarySyncProgress.Phase.COMPARE -> stringResource(MR.strings.library_sync_phase_compare)
+        LibrarySyncProgress.Phase.UPLOAD -> stringResource(MR.strings.library_sync_phase_upload)
+        LibrarySyncProgress.Phase.APPLY -> stringResource(MR.strings.library_sync_phase_apply)
+        null -> null
+    }?.let { stringResource(MR.strings.library_sync_step_phase, baseName, it) } ?: baseName
 }
 
 private fun mb(bytes: Int): String = String.format(Locale.ROOT, "%.1f", bytes / (1024f * 1024f))

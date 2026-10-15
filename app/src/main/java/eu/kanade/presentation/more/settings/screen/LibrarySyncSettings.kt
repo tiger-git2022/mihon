@@ -32,6 +32,7 @@ import eu.kanade.tachiyomi.data.sync.SettingsBackup
 import eu.kanade.tachiyomi.ui.library.librarySyncMessage
 import eu.kanade.tachiyomi.ui.library.librarySyncProgressText
 import eu.kanade.tachiyomi.util.system.toast
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -154,11 +155,11 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
                             null
                         } else {
                             action {
-                                runCatching {
-                                    withContext(Dispatchers.IO) { service.sync() }
-                                }.onSuccess { result ->
+                                // Fork: the sync goes on after the settings close, only the wait for it ends there
+                                runCatching { service.syncManually() }.onSuccess { result ->
                                     context.toast(context.librarySyncMessage(result))
                                 }.onFailure { error ->
+                                    if (error is CancellationException) throw error
                                     logcat(LogPriority.ERROR, error)
                                     context.toast(
                                         context.stringResource(
