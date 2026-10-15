@@ -7,6 +7,10 @@ import dev.zacsweers.metro.SingleIn
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.GlobalSearchHistoryPreferences
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SearchHistoryState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -39,6 +43,9 @@ class LibrarySyncService(
     private val settingsBackupSync: SettingsBackupSync,
 ) {
     private val syncMutex = Mutex()
+
+    // Fork: manual syncs run here, not in the screen that started them, see syncManually
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _progress = MutableStateFlow<LibrarySyncProgress?>(null)
 
@@ -108,6 +115,12 @@ class LibrarySyncService(
     internal fun setManualSyncRunning(running: Boolean) {
         _manualSyncRunning.value = running
     }
+
+    /**
+     * [sync] asked from a screen, run in the service's own scope: leaving the screen cancels only the wait for the
+     * result, the sync itself goes on.
+     */
+    suspend fun syncManually(): LibrarySyncResult = scope.async { sync() }.await()
 
     /**
      * [sync], unless [canStart] returns false once the previous sync has finished. Automatic syncs check their

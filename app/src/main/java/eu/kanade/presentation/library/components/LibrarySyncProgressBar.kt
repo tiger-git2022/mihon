@@ -54,6 +54,15 @@ fun LibrarySyncProgressBar(state: LibrarySyncActionState, modifier: Modifier = M
                     measurer.measure(text = shownText.full, style = style, maxLines = 1, softWrap = false)
                         .size.width <= maxWidth
                 }
+                // Digits of one width: the numbers do not jump while they count
+                val numberStyle = style.copy(fontFeatureSettings = "tnum")
+                // At a large font scale the count may not fit beside the step: the percent alone then
+                val numbers = remember(shownText.numbers, numberStyle, maxWidth) {
+                    val width = measurer
+                        .measure(text = shownText.numbers, style = numberStyle, maxLines = 1, softWrap = false)
+                        .size.width
+                    if (width > maxWidth * 0.6f) shownText.numbers.substringAfterLast("  ") else shownText.numbers
+                }
                 if (fits) {
                     Text(text = shownText.full, style = style, color = color, maxLines = 1)
                 } else {
@@ -66,10 +75,9 @@ fun LibrarySyncProgressBar(state: LibrarySyncActionState, modifier: Modifier = M
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
-                        // Digits of one width: the numbers do not jump while they count
                         Text(
-                            text = shownText.numbers,
-                            style = style.copy(fontFeatureSettings = "tnum"),
+                            text = numbers,
+                            style = numberStyle,
                             color = color,
                             maxLines = 1,
                             softWrap = false,
