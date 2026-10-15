@@ -63,7 +63,10 @@ internal fun getLibrarySyncGroup(): Preference.PreferenceGroup {
     val activity = remember(context) { context.findActivity() }
     var isBusy by remember { mutableStateOf(false) }
     // No signing out or second start while a manual sync is queued or runs, also after the settings were reopened
-    val manualSyncRunning by service.manualSyncRunning.collectAsStateWithLifecycle()
+    val manualSyncStarted by service.manualSyncRunning.collectAsStateWithLifecycle()
+    val manualSyncQueued by remember { LibraryManualSyncWorker.isQueued(context) }
+        .collectAsStateWithLifecycle(initialValue = false)
+    val manualSyncRunning = manualSyncStarted || manualSyncQueued
     // Also shows a sync started from the library toolbar
     val syncProgress by service.progress.collectAsStateWithLifecycle()
 

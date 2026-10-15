@@ -29,7 +29,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import logcat.LogPriority
@@ -55,6 +58,8 @@ class LibraryManualSyncWorker(context: Context, workerParams: WorkerParameters) 
 
     override suspend fun doWork(): Result {
         service.setManualSyncRunning(true)
+        // The result of an earlier sync no longer applies
+        applicationContext.cancelNotification(ID_RESULT)
         setForegroundSafely()
         return try {
             coroutineScope {
@@ -141,6 +146,15 @@ class LibraryManualSyncWorker(context: Context, workerParams: WorkerParameters) 
         // Kept here rather than in Notifications, which is an upstream file
         private const val ID_PROGRESS = -1101
         private const val ID_RESULT = -1102
+
+        /**
+         * A manual sync is queued or runs. Read from WorkManager, so it also covers work kept from a process that
+         * ended, which [LibrarySyncService.manualSyncRunning] does not know about.
+         */
+        fun isQueued(context: Context): Flow<Boolean> = context.workManager
+            .getWorkInfosForUniqueWorkFlow(WORK_NAME)
+            .map { infos -> infos.any { !it.state.isFinished } }
+            .distinctUntilChanged()
 
         /** Starts a manual sync, unless one is queued or running already. */
         fun start(context: Context) {

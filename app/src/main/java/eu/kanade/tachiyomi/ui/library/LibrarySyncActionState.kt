@@ -68,7 +68,10 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
     val librarySyncPreferences = remember { context.appGraph.librarySyncPreferences }
     val librarySyncService = remember { context.appGraph.librarySyncService }
     val accountName by librarySyncPreferences.accountName.collectAsState()
-    val isSyncing by librarySyncService.manualSyncRunning.collectAsStateWithLifecycle()
+    val manualSyncRunning by librarySyncService.manualSyncRunning.collectAsStateWithLifecycle()
+    val manualSyncQueued by remember { LibraryManualSyncWorker.isQueued(context) }
+        .collectAsStateWithLifecycle(initialValue = false)
+    val isSyncing = manualSyncRunning || manualSyncQueued
     val progress by librarySyncService.progress.collectAsStateWithLifecycle()
     val progressText = progress?.let { librarySyncProgressText(it) }
     val progressLine = progress?.let { librarySyncProgressLine(it) }
