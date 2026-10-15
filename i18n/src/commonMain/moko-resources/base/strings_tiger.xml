@@ -15,6 +15,7 @@
     <string name="library_sync_sign_in_failed">OneDrive sign-in failed: %s</string>
     <string name="library_sync_now">Sync now</string>
     <string name="library_sync_syncing">Syncing…</string>
+    <string name="library_sync_notification_title">OneDrive sync</string>
     <string name="library_sync_status_pending">OneDrive: changes waiting to sync</string>
     <string name="library_sync_status_succeeded">OneDrive: synced</string>
     <string name="library_sync_status_failed">OneDrive: the last sync failed</string>

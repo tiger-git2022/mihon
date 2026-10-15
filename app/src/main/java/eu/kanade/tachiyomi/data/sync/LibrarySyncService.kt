@@ -104,6 +104,18 @@ class LibrarySyncService(
      */
     suspend fun sync(): LibrarySyncResult = checkNotNull(syncIf(manual = true) { true })
 
+    private val _manualSyncRunning = MutableStateFlow(false)
+
+    /**
+     * True from the tap on sync until [LibraryManualSyncWorker] has finished that sync, which runs as WorkManager work
+     * so that it goes on in the background.
+     */
+    val manualSyncRunning: StateFlow<Boolean> = _manualSyncRunning.asStateFlow()
+
+    internal fun setManualSyncRunning(running: Boolean) {
+        _manualSyncRunning.value = running
+    }
+
     /**
      * [sync] asked from a screen, run in the service's own scope: leaving the screen cancels only the wait for the
      * result, the sync itself goes on.

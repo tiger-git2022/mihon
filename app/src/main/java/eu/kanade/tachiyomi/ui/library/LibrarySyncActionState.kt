@@ -7,10 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -18,13 +15,12 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.AppBarActions
 import eu.kanade.tachiyomi.data.sync.EhFavoritesSyncStage
+import eu.kanade.tachiyomi.data.sync.LibraryManualSyncWorker
 import eu.kanade.tachiyomi.data.sync.LibrarySyncProgress
 import eu.kanade.tachiyomi.data.sync.LibrarySyncResult
 import eu.kanade.tachiyomi.data.sync.SettingsBackupStage
 import eu.kanade.tachiyomi.ui.setting.SettingsScreen
 import eu.kanade.tachiyomi.util.system.toast
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
 import mihon.app.di.appGraph
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.rounded.DoneAll
@@ -68,12 +64,14 @@ class LibrarySyncActionState(
 fun rememberLibrarySyncAction(): LibrarySyncActionState {
     val navigator = LocalNavigator.currentOrThrow
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
     val librarySyncPreferences = remember { context.appGraph.librarySyncPreferences }
     val librarySyncService = remember { context.appGraph.librarySyncService }
     val accountName by librarySyncPreferences.accountName.collectAsState()
-    var isSyncing by remember { mutableStateOf(false) }
+    val manualSyncRunning by librarySyncService.manualSyncRunning.collectAsStateWithLifecycle()
+    val manualSyncQueued by remember { LibraryManualSyncWorker.isQueued(context) }
+        .collectAsStateWithLifecycle(initialValue = false)
+    val isSyncing = manualSyncRunning || manualSyncQueued
     val progress by librarySyncService.progress.collectAsStateWithLifecycle()
     val progressText = progress?.let { librarySyncProgressText(it) }
     val progressLine = progress?.let { librarySyncProgressLine(it) }
@@ -106,23 +104,9 @@ fun rememberLibrarySyncAction(): LibrarySyncActionState {
             return@onClick
         }
 
-        isSyncing = true
-        scope.launch {
-            // The sync goes on after this screen leaves, only the wait for it ends there
-            runCatching { librarySyncService.syncManually() }.onSuccess { result ->
-                context.toast(context.librarySyncMessage(result))
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                Log.e("LibrarySync", "Library sync failed", error)
-                context.toast(
-                    context.stringResource(
-                        MR.strings.library_sync_failed,
-                        error.message.orEmpty(),
-                    ),
-                )
-            }
-            isSyncing = false
-        }
+        // Runs as WorkManager work with a notification, so it goes on in the background; the worker shows
+        // the result
+        LibraryManualSyncWorker.start(context)
     }
     val fraction = progress?.fraction
     val title = when {
@@ -184,15 +168,20 @@ internal fun librarySyncProgressLine(progress: LibrarySyncProgress): LibrarySync
         progress.total > 0 -> "${progress.done}/${progress.total}"
         else -> null
     }
+    val stepName = LocalContext.current.librarySyncStepName(progress)
     return LibrarySyncProgressLine(
-        label = "${progress.step.number}/${LibrarySyncProgress.STEP_COUNT} ${librarySyncStepName(progress)}",
+        label = "${progress.step.number}/${LibrarySyncProgress.STEP_COUNT} $stepName",
         numbers = listOfNotNull(count, "${(progress.fraction * 100).toInt()}%").joinToString("  "),
         full = librarySyncProgressText(progress),
     )
 }
 
 @Composable
-internal fun librarySyncProgressText(progress: LibrarySyncProgress): String {
+internal fun librarySyncProgressText(progress: LibrarySyncProgress): String =
+    LocalContext.current.librarySyncProgressText(progress)
+
+/** Also the text of the sync notification, see [LibraryManualSyncWorker]. */
+internal fun Context.librarySyncProgressText(progress: LibrarySyncProgress): String {
     val stepName = librarySyncStepName(progress)
     val detail = when {
         // Bytes as megabytes: "Downloading EhViewer favorites 1.2/3.4 MB (35%)"
@@ -225,8 +214,7 @@ internal fun librarySyncProgressText(progress: LibrarySyncProgress): String {
 }
 
 /** The step and its part, "Library · comparing". */
-@Composable
-private fun librarySyncStepName(progress: LibrarySyncProgress): String {
+private fun Context.librarySyncStepName(progress: LibrarySyncProgress): String {
     val baseName = when (progress.step) {
         LibrarySyncProgress.Step.LIBRARY -> stringResource(MR.strings.library_sync_step_library)
         LibrarySyncProgress.Step.SEARCH_HISTORY -> stringResource(MR.strings.library_sync_step_search_history)
