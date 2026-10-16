@@ -57,7 +57,8 @@ fun GlassScaffold(
                 ) { topBar(behavior) }
             },
             bottomBar = bottomBar,
-            snackbarHost = snackbarHost,
+            // Fork: notifications must stay above the bar and beside the rail, like the page content.
+            snackbarHost = { Box(Modifier.padding(navigationPadding)) { snackbarHost() } },
         ) { padding ->
             val combinedPadding = PaddingValues(
                 start = padding.calculateStartPadding(direction) + navigationPadding.calculateStartPadding(direction),
