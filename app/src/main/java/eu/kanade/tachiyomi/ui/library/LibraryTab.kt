@@ -57,12 +57,12 @@ import tachiyomi.domain.category.model.Category
 import tachiyomi.domain.library.model.LibraryManga
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.i18n.MR
-import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.screens.EmptyScreen
 import tachiyomi.presentation.core.screens.EmptyScreenAction
 import tachiyomi.presentation.core.screens.LoadingScreen
 import tachiyomi.source.local.isLocal
+import eu.kanade.presentation.glass.GlassScaffold as Scaffold
 
 data object LibraryTab : Tab {
 
@@ -109,6 +109,7 @@ data object LibraryTab : Tab {
             started
         }
 
+        // Fork: scoped glass panels, original Material rendering when disabled.
         Scaffold(
             topBar = { scrollBehavior ->
                 val title = state.getToolbarTitle(

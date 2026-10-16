@@ -2,6 +2,7 @@ package eu.kanade.presentation.browse.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,14 +23,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import eu.kanade.presentation.components.SearchToolbar
+import eu.kanade.presentation.library.components.LibrarySyncProgressBar
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SourceFilter
+import eu.kanade.tachiyomi.ui.library.rememberLibrarySyncAction
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.rounded.DoneAll
 import mihon.icons.materialsymbols.rounded.FilterList
 import mihon.icons.materialsymbols.rounded.Keep
+import mihon.presentation.glass.glassContainerColor
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
@@ -50,11 +55,13 @@ fun GlobalSearchToolbar(
     scrollBehavior: TopAppBarScrollBehavior,
     // Fork: actions right of the search field
     actions: @Composable RowScope.() -> Unit = {},
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
 ) {
-    Column(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+    Column(modifier = Modifier.background(glassContainerColor(MaterialTheme.colorScheme.surface))) {
         Box {
             SearchToolbar(
                 searchQuery = searchQuery,
+                interactionSource = interactionSource,
                 onChangeSearchQuery = onChangeSearchQuery,
                 onSearch = onSearch,
                 onClickCloseSearch = navigateUp,
@@ -133,5 +140,6 @@ fun GlobalSearchToolbar(
         }
 
         HorizontalDivider()
+        LibrarySyncProgressBar(rememberLibrarySyncAction()) // Fork: live sync progress
     }
 }

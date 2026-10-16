@@ -59,6 +59,7 @@ import mihon.icons.materialsymbols.automirroredrounded.ArrowBack
 import mihon.icons.materialsymbols.rounded.Close
 import mihon.icons.materialsymbols.rounded.MoreVert
 import mihon.icons.materialsymbols.rounded.Search
+import mihon.presentation.glass.glassContainerColor
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.clearFocusOnSoftKeyboardHide
@@ -156,8 +157,14 @@ fun AppBar(
             title = titleContent,
             actions = actions,
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = backgroundColor ?: MaterialTheme.colorScheme.surfaceColorAtElevation(
-                    elevation = if (isActionMode) 3.dp else 0.dp,
+                // Fork: the page scaffold owns the glass; retain normal colors outside it.
+                containerColor = glassContainerColor(
+                    backgroundColor ?: MaterialTheme.colorScheme.surfaceColorAtElevation(
+                        elevation = if (isActionMode) 3.dp else 0.dp,
+                    ),
+                ),
+                scrolledContainerColor = glassContainerColor(
+                    TopAppBarDefaults.topAppBarColors().scrolledContainerColor,
                 ),
             ),
             scrollBehavior = scrollBehavior,
