@@ -47,6 +47,9 @@ include(":source-api")
 include(":source-local")
 include(":telemetry")
 
+// Fork: optional glass components, kept separate from upstream presentation modules.
+include(":presentation-glass")
+
 // region Fork (tiger-git2022/mihon): local-only build output redirect
 // Keeps generated files outside OneDrive so cloud placeholders and sync locks cannot corrupt
 // Gradle's incremental compilation snapshots. Off on CI (`CI` env var) or with -Ptiger.localBuildDir=false.

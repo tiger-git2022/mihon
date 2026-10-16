@@ -37,7 +37,8 @@ fun TachiyomiTheme(
     BaseTachiyomiTheme(
         appTheme = appTheme ?: uiPreferences.appTheme.get(),
         isAmoled = amoled ?: uiPreferences.themeDarkAmoled.get(),
-        content = content,
+        // Fork: opt-in glass state, independent of the upstream Material theme.
+        content = { ProvideLiquidGlass(content = content) },
     )
 }
 

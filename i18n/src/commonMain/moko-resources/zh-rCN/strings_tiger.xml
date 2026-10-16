@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Glass components -->
+    <string name="pref_liquid_glass">液态玻璃</string>
+    <string name="pref_liquid_glass_summary">在支持的位置使用玻璃组件。组件将在后续更新中加入，当前界面暂不变化。</string>
+
     <string name="recent_searches">最近搜索</string>
     <string name="clear_search_history">清空搜索历史</string>
     <string name="library_sync">书架同步</string>

@@ -91,6 +91,7 @@ object SettingsAppearanceScreen : SearchableSettings {
                         true
                     },
                 ),
+                getLiquidGlassPreference(), // Fork: optional glass components
             ),
         )
     }
