@@ -218,6 +218,7 @@ dependencies {
     implementation(projects.domain)
     implementation(projects.presentationCore)
     implementation(projects.presentationWidget)
+    implementation(projects.presentationGlass) // Fork: optional glass components
     implementation(projects.telemetry)
 
     // Compose
