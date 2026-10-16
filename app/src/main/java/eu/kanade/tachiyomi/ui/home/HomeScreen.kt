@@ -10,7 +10,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.material3.adaptive.navigationsuite.rememberNavigationSuiteScaffoldState
 import androidx.compose.material3.surfaceColorAtElevation
@@ -50,6 +49,7 @@ import soup.compose.material.motion.animation.materialFadeThroughIn
 import soup.compose.material.motion.animation.materialFadeThroughOut
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.pluralStringResource
+import eu.kanade.presentation.glass.GlassNavigationScaffold as NavigationSuiteScaffold
 
 object HomeScreen : Screen() {
 
@@ -98,8 +98,10 @@ object HomeScreen : Screen() {
                     }
                 }
 
+                // Fork: scoped glass panels, original Material rendering when disabled.
                 NavigationSuiteScaffold(
                     navigationSuiteType = navigationSuiteType,
+                    contentBehindNavigation = tabNavigator.current == LibraryTab || tabNavigator.current == BrowseTab,
                     state = navigationSuiteState,
                     navigationSuiteColors = NavigationSuiteDefaults.colors(
                         navigationRailContainerColor = MaterialTheme.colorScheme

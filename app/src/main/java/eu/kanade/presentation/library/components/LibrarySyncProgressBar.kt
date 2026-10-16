@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.components.SyncLinearProgressIndicator
 import eu.kanade.tachiyomi.ui.library.LibrarySyncActionState
 import eu.kanade.tachiyomi.ui.library.LibrarySyncProgressLine
+import mihon.presentation.glass.glassContainerColor
 
 /**
  * Progress of a running OneDrive library sync below the library toolbar (fork-only feature): a bar for the whole
@@ -37,7 +38,7 @@ fun LibrarySyncProgressBar(state: LibrarySyncActionState, modifier: Modifier = M
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface),
+                .background(glassContainerColor(MaterialTheme.colorScheme.surface)),
         ) {
             SyncLinearProgressIndicator(fraction = shownProgress, modifier = Modifier.fillMaxWidth())
             BoxWithConstraints(

@@ -58,6 +58,7 @@ import eu.kanade.presentation.manga.components.MangaToolbar
 import eu.kanade.presentation.manga.components.MissingChapterCountListItem
 import eu.kanade.presentation.manga.components.ReadMarkActionButton
 import eu.kanade.presentation.manga.components.rememberEhViewerSearchActions
+import eu.kanade.presentation.manga.components.rememberWebsitePreviewActions
 import eu.kanade.presentation.util.formatChapterNumber
 import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.data.download.rememberChapterDownloadSize
@@ -306,7 +307,8 @@ private fun MangaScreenSmallImpl(
                 onClickRefresh = onRefresh,
                 onClickMigrate = onMigrateClicked,
                 onClickEditNotes = onEditNotesClicked,
-                extraOverflowActions = rememberEhViewerSearchActions(state.manga),
+                extraOverflowActions = rememberEhViewerSearchActions(state.manga) +
+                    rememberWebsitePreviewActions(state.manga), // Fork: actual website thumbnails only
                 actionModeCounter = state.selectedChapters.size,
                 onCancelActionMode = { onAllChapterSelected(false) },
                 onSelectAll = { onAllChapterSelected(true) },
@@ -536,7 +538,8 @@ fun MangaScreenLargeImpl(
                 onClickRefresh = onRefresh,
                 onClickMigrate = onMigrateClicked,
                 onClickEditNotes = onEditNotesClicked,
-                extraOverflowActions = rememberEhViewerSearchActions(state.manga),
+                extraOverflowActions = rememberEhViewerSearchActions(state.manga) +
+                    rememberWebsitePreviewActions(state.manga), // Fork: actual website thumbnails only
                 onCancelActionMode = { onAllChapterSelected(false) },
                 actionModeCounter = state.selectedChapters.size,
                 onSelectAll = { onAllChapterSelected(true) },

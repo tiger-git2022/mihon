@@ -28,6 +28,7 @@ import eu.kanade.tachiyomi.data.download.DownloadWorker
 import eu.kanade.tachiyomi.data.library.LibraryUpdateWorker
 import eu.kanade.tachiyomi.data.library.MetadataUpdateWorker
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
+import eu.kanade.tachiyomi.data.preview.WebsitePreviewRepository
 import eu.kanade.tachiyomi.data.sync.EhFavoritesStore
 import eu.kanade.tachiyomi.data.sync.LibraryAutoSync
 import eu.kanade.tachiyomi.data.sync.LibrarySyncPreferences
@@ -59,6 +60,7 @@ import tachiyomi.domain.category.interactor.ResetCategoryFlags
 import tachiyomi.domain.download.service.DownloadPreferences
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.manga.interactor.GetFavorites
+import tachiyomi.domain.manga.interactor.GetMangaWithChapters
 import tachiyomi.domain.manga.interactor.ResetViewerFlags
 import tachiyomi.domain.source.service.SourceManager
 import tachiyomi.domain.storage.service.StoragePreferences
@@ -118,6 +120,10 @@ interface AppGraph : ViewModelGraph {
 
     val trustExtension: TrustExtension
     val extensionStoreRepository: ExtensionStoreRepository
+
+    // Fork: optional server-provided page previews.
+    val websitePreviews: WebsitePreviewRepository
+    val getMangaWithChapters: GetMangaWithChapters
 
     val sourceManager: SourceManager
     val trackerManager: TrackerManager

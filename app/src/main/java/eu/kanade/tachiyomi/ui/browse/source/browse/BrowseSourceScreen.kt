@@ -36,6 +36,7 @@ import eu.kanade.presentation.browse.MissingSourceScreen
 import eu.kanade.presentation.browse.components.BrowseSourceToolbar
 import eu.kanade.presentation.browse.components.RemoveMangaDialog
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
+import eu.kanade.presentation.library.components.LibrarySyncProgressBar
 import eu.kanade.presentation.manga.DuplicateMangaDialog
 import eu.kanade.presentation.util.AssistContentScreen
 import eu.kanade.presentation.util.Screen
@@ -43,6 +44,7 @@ import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.browse.extension.details.SourcePreferencesScreen
 import eu.kanade.tachiyomi.ui.browse.source.browse.BrowseSourceViewModel.Listing
 import eu.kanade.tachiyomi.ui.category.CategoryScreen
+import eu.kanade.tachiyomi.ui.library.rememberLibrarySyncAction
 import eu.kanade.tachiyomi.ui.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.webview.WebViewScreen
 import kotlinx.coroutines.Dispatchers
@@ -56,14 +58,15 @@ import mihon.icons.materialsymbols.rounded.FilterList
 import mihon.icons.materialsymbols.rounded.Verified
 import mihon.icons.materialsymbols.roundedfilled.Favorite
 import mihon.presentation.core.util.collectAsLazyPagingItems
+import mihon.presentation.glass.glassContainerColor
 import tachiyomi.core.common.Constants
 import tachiyomi.domain.source.model.StubSource
 import tachiyomi.i18n.MR
-import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.screens.LoadingScreen
 import tachiyomi.source.local.LocalSource
+import eu.kanade.presentation.glass.GlassScaffold as Scaffold
 
 data class BrowseSourceScreen(
     val sourceId: Long,
@@ -125,11 +128,12 @@ data class BrowseSourceScreen(
             assistUrl = (source as? HttpSource)?.getHomeUrl()
         }
 
+        // Fork: scoped glass panels, original Material rendering when disabled.
         Scaffold(
             topBar = {
                 Column(
                     modifier = Modifier
-                        .background(MaterialTheme.colorScheme.surface)
+                        .background(glassContainerColor(MaterialTheme.colorScheme.surface))
                         .pointerInput(Unit) {},
                 ) {
                     BrowseSourceToolbar(
@@ -209,6 +213,7 @@ data class BrowseSourceScreen(
                     }
 
                     HorizontalDivider()
+                    LibrarySyncProgressBar(rememberLibrarySyncAction()) // Fork: progress while browsing
                 }
             },
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },

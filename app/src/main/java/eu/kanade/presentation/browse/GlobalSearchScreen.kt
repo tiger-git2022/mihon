@@ -1,13 +1,20 @@
 package eu.kanade.presentation.browse
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import eu.kanade.presentation.browse.components.GlobalSearchCardRow
 import eu.kanade.presentation.browse.components.GlobalSearchErrorResultItem
-import eu.kanade.presentation.browse.components.GlobalSearchHistoryContent
+import eu.kanade.presentation.browse.components.GlobalSearchHistoryOverlay
 import eu.kanade.presentation.browse.components.GlobalSearchLoadingResultItem
 import eu.kanade.presentation.browse.components.GlobalSearchResultItem
 import eu.kanade.presentation.browse.components.GlobalSearchToolbar
@@ -19,8 +26,8 @@ import eu.kanade.tachiyomi.ui.library.LibrarySyncActions
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.i18n.MR
-import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
+import eu.kanade.presentation.glass.GlassScaffold as Scaffold
 
 @Composable
 fun GlobalSearchScreen(
@@ -38,15 +45,31 @@ fun GlobalSearchScreen(
     onClickItem: (Manga) -> Unit,
     onLongClickItem: (Manga) -> Unit,
 ) {
+    // Fork: history belongs to the editing state, independent of whether the query is empty.
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val closeHistory = {
+        focusManager.clearFocus()
+        keyboard?.hide()
+        Unit
+    }
+    BackHandler(enabled = focused) { closeHistory() }
+    // Fork: scoped glass panels, original Material rendering when disabled.
     Scaffold(
         topBar = { scrollBehavior ->
             GlobalSearchToolbar(
                 searchQuery = state.searchQuery,
+                interactionSource = interaction,
                 progress = state.progress,
                 total = state.total,
                 navigateUp = navigateUp,
                 onChangeSearchQuery = onChangeSearchQuery,
-                onSearch = onSearch,
+                onSearch = {
+                    closeHistory()
+                    onSearch(it)
+                },
                 hideSourceFilter = false,
                 sourceFilter = state.sourceFilter,
                 onChangeSearchFilter = onChangeSearchFilter,
@@ -57,25 +80,30 @@ fun GlobalSearchScreen(
                 actions = { LibrarySyncActions() },
             )
         },
+        overlay = { padding ->
+            if (state.searchHistory.isNotEmpty() && (focused || state.searchQuery.isNullOrBlank())) {
+                GlobalSearchHistoryOverlay(
+                    history = state.searchHistory,
+                    contentPadding = padding,
+                    onClick = { query ->
+                        closeHistory()
+                        onClickSearchHistory(query)
+                    },
+                    onDelete = onDeleteSearchHistory,
+                    onClear = onClearSearchHistory,
+                )
+            }
+        },
     ) { paddingValues ->
-        if (state.searchQuery.isNullOrBlank() && state.searchHistory.isNotEmpty()) {
-            GlobalSearchHistoryContent(
-                history = state.searchHistory,
-                contentPadding = paddingValues,
-                onClick = onClickSearchHistory,
-                onDelete = onDeleteSearchHistory,
-                onClear = onClearSearchHistory,
-            )
-        } else {
-            GlobalSearchContent(
-                items = state.filteredItems,
-                contentPadding = paddingValues,
-                getManga = getManga,
-                onClickSource = onClickSource,
-                onClickItem = onClickItem,
-                onLongClickItem = onLongClickItem,
-            )
-        }
+        // Keep results and their scroll position mounted below the editing overlay.
+        GlobalSearchContent(
+            items = state.filteredItems,
+            contentPadding = paddingValues,
+            getManga = getManga,
+            onClickSource = onClickSource,
+            onClickItem = onClickItem,
+            onLongClickItem = onLongClickItem,
+        )
     }
 }
 

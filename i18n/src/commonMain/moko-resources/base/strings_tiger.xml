@@ -1,9 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Fork-only strings (tiger-git2022/mihon). Kept separate from strings.xml to avoid merge conflicts with upstream. -->
 <resources>
+    <!-- Server-provided page previews -->
+    <string name="website_page_previews">Page previews</string>
+    <string name="website_preview_page_number">Page %d</string>
+    <string name="website_previews_unavailable">This website does not provide page thumbnails.</string>
+    <string name="website_previews_no_chapters">Refresh the chapter list before opening page previews.</string>
+
     <!-- Glass components -->
     <string name="pref_liquid_glass">Liquid glass</string>
-    <string name="pref_liquid_glass_summary">Use glass components where available. Components will be added in future updates; the current interface is unchanged.</string>
+    <string name="pref_liquid_glass_summary">Glass toolbars, navigation, search history and sync progress.</string>
 
     <!-- Global search history -->
     <string name="recent_searches">Recent searches</string>

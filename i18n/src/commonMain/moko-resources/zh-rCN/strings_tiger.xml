@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Server-provided page previews -->
+    <string name="website_page_previews">页面预览</string>
+    <string name="website_preview_page_number">第 %d 页</string>
+    <string name="website_previews_unavailable">此网站未提供可用的逐页缩略图。</string>
+    <string name="website_previews_no_chapters">请先返回刷新章节列表，再打开页面预览。</string>
+
     <!-- Glass components -->
     <string name="pref_liquid_glass">液态玻璃</string>
-    <string name="pref_liquid_glass_summary">在支持的位置使用玻璃组件。组件将在后续更新中加入，当前界面暂不变化。</string>
+    <string name="pref_liquid_glass_summary">为顶部栏、导航栏、搜索历史和同步进度启用玻璃效果。</string>
 
     <string name="recent_searches">最近搜索</string>
     <string name="clear_search_history">清空搜索历史</string>
