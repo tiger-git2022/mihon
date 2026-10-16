@@ -66,6 +66,7 @@ data class WebsitePreviewScreen(val mangaId: Long) : Screen() {
         var error by remember { mutableStateOf<String?>(null) }
         val loadingErrorText = stringResource(MR.strings.internal_error)
         val data by produceState<PreviewData?>(null, mangaId, retry) {
+            value = null
             error = null
             try {
                 val interactor = graph.getMangaWithChapters

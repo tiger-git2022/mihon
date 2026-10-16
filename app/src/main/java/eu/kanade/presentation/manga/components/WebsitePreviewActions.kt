@@ -23,6 +23,7 @@ internal fun rememberWebsitePreviewActions(manga: Manga): List<AppBar.OverflowAc
     val context = LocalContext.current
     val graph = context.appGraph
     val available by produceState(false, manga.id, manga.url, manga.source) {
+        value = false
         value = try {
             val source = graph.sourceManager.getOrStub(manga.source) as? HttpSource
                 ?: return@produceState
