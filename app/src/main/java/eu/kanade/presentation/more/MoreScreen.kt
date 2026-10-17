@@ -22,9 +22,9 @@ import mihon.icons.materialsymbols.roundedfilled.VolunteerActivism
 import tachiyomi.core.common.Constants
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.ScrollbarLazyColumn
-import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.pluralStringResource
 import tachiyomi.presentation.core.i18n.stringResource
+import eu.kanade.presentation.glass.GlassScaffold as Scaffold
 
 @Composable
 fun MoreScreen(
@@ -43,7 +43,8 @@ fun MoreScreen(
 ) {
     val uriHandler = LocalUriHandler.current
 
-    Scaffold { contentPadding ->
+    // Fork: no top bar to glass; the scaffold keeps the list clear of the glass navigation.
+    Scaffold(enabled = false) { contentPadding ->
         ScrollbarLazyColumn(contentPadding = contentPadding) {
             item {
                 LogoHeader(

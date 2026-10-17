@@ -32,6 +32,7 @@ import eu.kanade.tachiyomi.data.sync.searchHistoryKey
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SearchHistoryItem
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.rounded.Close
+import mihon.presentation.glass.GlassStyle
 import mihon.presentation.glass.LocalGlassBackdrop
 import mihon.presentation.glass.glassPanel
 import tachiyomi.i18n.MR
@@ -49,7 +50,7 @@ internal fun GlobalSearchHistoryOverlay(
     val glass = LocalGlassBackdrop.current != null
     Box(
         Modifier.fillMaxSize().padding(contentPadding).imePadding()
-            .glassPanel(shape = RoundedCornerShape(24.dp), strongBlur = true)
+            .glassPanel(shape = RoundedCornerShape(24.dp), style = GlassStyle.Sheet)
             .background(if (glass) Color.Transparent else MaterialTheme.colorScheme.surface),
     ) {
         GlobalSearchHistoryContent(history, PaddingValues(vertical = 12.dp), onClick, onDelete, onClear)

@@ -101,7 +101,8 @@ object HomeScreen : Screen() {
                 // Fork: scoped glass panels, original Material rendering when disabled.
                 NavigationSuiteScaffold(
                     navigationSuiteType = navigationSuiteType,
-                    contentBehindNavigation = tabNavigator.current == LibraryTab || tabNavigator.current == BrowseTab,
+                    // Fork: every home tab reserves scroll padding, so the glass bar always floats over content.
+                    contentBehindNavigation = true,
                     state = navigationSuiteState,
                     navigationSuiteColors = NavigationSuiteDefaults.colors(
                         navigationRailContainerColor = MaterialTheme.colorScheme
