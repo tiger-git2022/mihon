@@ -13,6 +13,7 @@ import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import cafe.adriel.voyager.navigator.tab.TabOptions
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import eu.kanade.presentation.components.TabbedScreen
+import eu.kanade.presentation.glass.GlassSnapshot
 import eu.kanade.presentation.util.Tab
 import eu.kanade.presentation.util.rememberAnimatedVectorPainter
 import eu.kanade.tachiyomi.R
@@ -45,6 +46,7 @@ data object BrowseTab : Tab {
         }
 
     override suspend fun onReselect(navigator: Navigator) {
+        GlassSnapshot.capture() // Fork: a picture of this page behind the glass of the search
         navigator.push(GlobalSearchScreen())
     }
 
