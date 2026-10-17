@@ -11,6 +11,7 @@ android {
 dependencies {
     api(libs.androidx.compose.runtime)
     api(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
     // Backdrop is part of the API used by future glass components and their content sources.
     api(libs.backdrop)

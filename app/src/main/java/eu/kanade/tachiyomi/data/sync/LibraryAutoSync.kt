@@ -27,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -292,6 +293,14 @@ class LibraryAutoSync(
         if (!canSync()) return WorkOutcome.SUCCESS
         // Queued with a network constraint from before "only on Wi-Fi" was turned on
         if (!isNetworkAllowed()) return WorkOutcome.RETRY
+        // Fork: run in the process's own scope, like a manual sync. The system may stop this work at any time (a plain
+        // job also ends after ten minutes), which used to cancel a long sync halfway, with the EhViewer favorites of a
+        // large account mostly; a stop now cancels only the wait for the result, the sync itself goes on. A retry of
+        // the work then finds the requests synced, see isCatchUpPending.
+        return scope.async { runWorkSync(runAttemptCount, ::canSync) }.await()
+    }
+
+    private suspend fun runWorkSync(runAttemptCount: Int, canSync: () -> Boolean): WorkOutcome {
         var request = 0L
         val outcome = try {
             // Background syncs show nothing
