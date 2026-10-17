@@ -6,7 +6,8 @@
     <string name="website_preview_page_number">Page %d</string>
     <string name="website_previews_unavailable">This website does not provide page thumbnails.</string>
     <string name="website_previews_no_chapters">Refresh the chapter list before opening page previews.</string>
-    <string name="website_previews_show_all">All</string>
+    <string name="website_previews_show_all">Show all</string>
+    <string name="website_previews_columns">%d columns</string>
 
     <!-- Glass components -->
     <string name="pref_liquid_glass">Liquid glass</string>

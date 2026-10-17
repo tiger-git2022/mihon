@@ -37,6 +37,8 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
 import eu.kanade.domain.chapter.model.toSChapter
 import eu.kanade.presentation.components.AppBar
+import eu.kanade.presentation.manga.components.WebsitePreviewColumnChoices
+import eu.kanade.presentation.manga.components.WebsitePreviewColumnsButton
 import eu.kanade.presentation.manga.components.rememberWebsitePreviewImageLoader
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.data.preview.WebsiteThumbnail
@@ -50,6 +52,7 @@ import tachiyomi.domain.manga.model.Manga
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
+import tachiyomi.presentation.core.util.collectAsState
 
 private data class PreviewData(val manga: Manga, val chapters: List<Chapter>, val source: HttpSource?)
 
@@ -80,8 +83,14 @@ data class WebsitePreviewScreen(val mangaId: Long) : Screen() {
                 error = e.message ?: loadingErrorText
             }
         }
+        val columnsPreference = remember { graph.glassPreferences.websitePreviewColumns }
+        val columns by columnsPreference.collectAsState()
         Scaffold(topBar = {
-            AppBar(title = stringResource(MR.strings.website_page_previews), navigateUp = navigator::pop)
+            AppBar(
+                title = stringResource(MR.strings.website_page_previews),
+                navigateUp = navigator::pop,
+                actions = { WebsitePreviewColumnsButton(columns, columnsPreference::set) },
+            )
         }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
                 val loaded = data
@@ -126,7 +135,7 @@ data class WebsitePreviewScreen(val mangaId: Long) : Screen() {
                     Text(stringResource(MR.strings.website_previews_unavailable), modifier = Modifier.padding(16.dp))
                     return@Column
                 }
-                WebsitePreviewGrid(source, startUrl) { index ->
+                WebsitePreviewGrid(source, startUrl, columns.coerceIn(WebsitePreviewColumnChoices)) { index ->
                     context.startActivity(
                         ReaderActivity.newIntent(context, manga.id, chapter.id)
                             // ReaderViewModel already restores this explicit page from its SavedStateHandle.
@@ -139,14 +148,19 @@ data class WebsitePreviewScreen(val mangaId: Long) : Screen() {
 }
 
 @Composable
-private fun WebsitePreviewGrid(source: HttpSource, initialUrl: String, onPageClick: (Int) -> Unit) {
+private fun WebsitePreviewGrid(source: HttpSource, initialUrl: String, columns: Int, onPageClick: (Int) -> Unit) {
     androidx.compose.runtime.key(source.id, initialUrl) {
-        WebsitePreviewGridContent(source, initialUrl, onPageClick)
+        WebsitePreviewGridContent(source, initialUrl, columns, onPageClick)
     }
 }
 
 @Composable
-private fun WebsitePreviewGridContent(source: HttpSource, initialUrl: String, onPageClick: (Int) -> Unit) {
+private fun WebsitePreviewGridContent(
+    source: HttpSource,
+    initialUrl: String,
+    columns: Int,
+    onPageClick: (Int) -> Unit,
+) {
     val context = LocalContext.current
     val repository = context.appGraph.websitePreviews
     val scope = rememberCoroutineScope()
@@ -179,7 +193,7 @@ private fun WebsitePreviewGridContent(source: HttpSource, initialUrl: String, on
     androidx.compose.runtime.key(initialUrl) {
         LaunchedEffect(initialUrl) { loadNext() }
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(100.dp),
+            columns = GridCells.Fixed(columns),
             contentPadding = PaddingValues(12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

@@ -46,6 +46,7 @@ import androidx.compose.ui.util.fastAll
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastMap
 import eu.kanade.presentation.components.relativeDateText
+import eu.kanade.presentation.glass.GlassScaffold
 import eu.kanade.presentation.manga.components.ChapterDownloadAction
 import eu.kanade.presentation.manga.components.ChapterHeader
 import eu.kanade.presentation.manga.components.EhFavoriteActionButton
@@ -57,8 +58,9 @@ import eu.kanade.presentation.manga.components.MangaInfoBox
 import eu.kanade.presentation.manga.components.MangaToolbar
 import eu.kanade.presentation.manga.components.MissingChapterCountListItem
 import eu.kanade.presentation.manga.components.ReadMarkActionButton
-import eu.kanade.presentation.manga.components.WebsitePreviewStrip
 import eu.kanade.presentation.manga.components.rememberEhViewerSearchActions
+import eu.kanade.presentation.manga.components.rememberWebsitePreviewState
+import eu.kanade.presentation.manga.components.websitePreviewItems
 import eu.kanade.presentation.util.formatChapterNumber
 import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.data.download.rememberChapterDownloadSize
@@ -76,7 +78,6 @@ import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.TwoPanelBox
 import tachiyomi.presentation.core.components.VerticalFastScroller
 import tachiyomi.presentation.core.components.material.PullRefresh
-import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.shouldExpandFAB
 import tachiyomi.source.local.isLocal
@@ -267,6 +268,14 @@ private fun MangaScreenSmallImpl(
     onInvertSelection: () -> Unit,
 ) {
     val chapterListState = rememberLazyListState()
+    // Fork: website page previews below the chapters, nothing when the website has none.
+    val websitePreviews = rememberWebsitePreviewState(
+        state.manga,
+        state.source,
+        remember(state.chapters) {
+            state.chapters.map { it.chapter }
+        },
+    )
 
     val (chapters, listItem, isAnySelected) = remember(state) {
         Triple(
@@ -280,7 +289,14 @@ private fun MangaScreenSmallImpl(
         onAllChapterSelected(false)
     }
 
-    Scaffold(
+    // Fork: like the gallery details of EhViewer, the bar turns to glass once the details scroll under it.
+    val scrolledUnderBar by remember {
+        derivedStateOf {
+            chapterListState.firstVisibleItemIndex > 0 || chapterListState.firstVisibleItemScrollOffset > 0
+        }
+    }
+    GlassScaffold(
+        topBarGlass = scrolledUnderBar || isAnySelected,
         topBar = {
             val isFirstItemVisible by remember {
                 derivedStateOf { chapterListState.firstVisibleItemIndex == 0 }
@@ -423,11 +439,6 @@ private fun MangaScreenSmallImpl(
                         )
                     }
 
-                    // Fork: website page previews on the details, nothing when the website has none.
-                    item(key = "website_previews", contentType = "website_previews") {
-                        WebsitePreviewStrip(state.manga, state.source, state.chapters.map { it.chapter })
-                    }
-
                     item(
                         key = MangaScreenItem.CHAPTER_HEADER,
                         contentType = MangaScreenItem.CHAPTER_HEADER,
@@ -452,6 +463,8 @@ private fun MangaScreenSmallImpl(
                         onChapterSelected = onChapterSelected,
                         onChapterSwipe = onChapterSwipe,
                     )
+
+                    websitePreviewItems(websitePreviews) // Fork
                 }
             }
         }
@@ -523,12 +536,21 @@ fun MangaScreenLargeImpl(
     var topBarHeight by remember { mutableIntStateOf(0) }
 
     val chapterListState = rememberLazyListState()
+    // Fork: website page previews below the chapters, nothing when the website has none.
+    val websitePreviews = rememberWebsitePreviewState(
+        state.manga,
+        state.source,
+        remember(state.chapters) {
+            state.chapters.map { it.chapter }
+        },
+    )
 
     BackHandler(enabled = isAnySelected) {
         onAllChapterSelected(false)
     }
 
-    Scaffold(
+    // Fork: the details scroll under the bar, which is glass when enabled.
+    GlassScaffold(
         topBar = {
             MangaToolbar(
                 modifier = Modifier.onSizeChanged { topBarHeight = it.height },
@@ -643,8 +665,6 @@ fun MangaScreenLargeImpl(
                             onCopyTagToClipboard = onCopyTagToClipboard,
                             onEditNotes = onEditNotesClicked,
                         )
-                        // Fork: website page previews on the details, nothing when the website has none.
-                        WebsitePreviewStrip(state.manga, state.source, state.chapters.map { it.chapter })
                     }
                 },
                 endContent = {
@@ -684,6 +704,8 @@ fun MangaScreenLargeImpl(
                                 onChapterSelected = onChapterSelected,
                                 onChapterSwipe = onChapterSwipe,
                             )
+
+                            websitePreviewItems(websitePreviews) // Fork
                         }
                     }
                 },
