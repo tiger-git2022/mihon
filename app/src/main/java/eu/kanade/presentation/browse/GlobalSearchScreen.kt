@@ -63,8 +63,9 @@ fun GlobalSearchScreen(
         keyboard?.hide()
         Unit
     }
-    BackHandler(enabled = historyOpen) { closeHistory() }
     val showHistory = state.searchHistory.isNotEmpty() && (historyOpen || state.searchQuery.isNullOrBlank())
+    // Only while the history is on screen: with it emptied, Back leaves the screen at once.
+    BackHandler(enabled = historyOpen && showHistory) { closeHistory() }
     // Fork: scoped glass panels, original Material rendering when disabled.
     Scaffold(
         // Fork: with glass, the history and the bar share one sheet.
