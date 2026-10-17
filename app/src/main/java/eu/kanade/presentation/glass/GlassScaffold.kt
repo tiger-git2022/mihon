@@ -15,7 +15,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import mihon.presentation.glass.GlassEdge
 import mihon.presentation.glass.LocalGlassBackdrop
@@ -23,6 +26,7 @@ import mihon.presentation.glass.glassBar
 import mihon.presentation.glass.glassContent
 import mihon.presentation.glass.rememberGlassBackdrop
 import tachiyomi.presentation.core.components.material.Scaffold
+import kotlin.math.roundToInt
 
 /** Navigation overlays reserve scroll padding, while allowing lists to draw behind the glass. */
 internal val LocalGlassNavigationPadding = compositionLocalOf { PaddingValues(0.dp) }
@@ -40,6 +44,8 @@ fun GlassScaffold(
     enabled: Boolean = true,
     // Fork: false while a full-screen glass overlay lies behind the bar, so both read as one sheet.
     topBarGlass: Boolean = true,
+    // Fork: a still picture drawn under the page content, seen and refracted through the glass.
+    background: ImageBitmap? = null,
     overlay: @Composable (PaddingValues) -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
@@ -80,7 +86,13 @@ fun GlassScaffold(
                     LocalGlassBackdrop provides null,
                     LocalGlassPageContent provides (backdrop != null),
                 ) {
-                    Box(Modifier.fillMaxSize().glassContent(backdrop)) { content(combinedPadding) }
+                    Box(
+                        Modifier.fillMaxSize().glassContent(backdrop).drawBehind {
+                            background?.let {
+                                drawImage(it, dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()))
+                            }
+                        },
+                    ) { content(combinedPadding) }
                 }
                 overlay(combinedPadding)
             }

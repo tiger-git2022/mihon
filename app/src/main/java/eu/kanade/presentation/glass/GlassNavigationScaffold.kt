@@ -72,7 +72,8 @@ fun GlassNavigationScaffold(
         }
     }
     Box(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().glassContent(backdrop)) {
+        // Fork: recorded twice, for the glass in front and for the picture behind the global search.
+        Box(Modifier.fillMaxSize().glassContent(backdrop).then(with(GlassSnapshot) { Modifier.recordSnapshot() })) {
             // Other home pages keep the original reserved space. Opted-in lists reserve scroll padding instead.
             Box(
                 Modifier.fillMaxSize()

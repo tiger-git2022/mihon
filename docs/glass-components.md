@@ -18,6 +18,9 @@
 - 顶栏和底部导航都贴着屏幕边缘（`glassBar`）：没有圆角、阴影和亮边，只在朝向页面的一边画一条细线，
   顶栏是下边，底栏是上边，平板侧边导航是右边。浮动的部分（搜索历史卡片等）仍用 `glassPanel`。
 
+- 从浏览页打开全局搜索时，先给浏览页拍一张静态图（`GlassSnapshot`），在还没有搜索结果时垫在搜索历史的玻璃后面，
+  看起来像叠在浏览页上；有结果后改为透出结果。只在玻璃开启时录制和拍图，离开搜索页即释放。
+
 ## 实现边界
 
 `presentation-glass` 独立提供 `LocalLiquidGlassEnabled`、`rememberGlassBackdrop`、`glassContent` 和 `glassPanel`。

@@ -6,6 +6,7 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -22,6 +23,7 @@ import eu.kanade.presentation.browse.components.GlobalSearchHistoryOverlay
 import eu.kanade.presentation.browse.components.GlobalSearchLoadingResultItem
 import eu.kanade.presentation.browse.components.GlobalSearchResultItem
 import eu.kanade.presentation.browse.components.GlobalSearchToolbar
+import eu.kanade.presentation.glass.GlassSnapshot
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SearchItemResult
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SearchViewModel
@@ -68,9 +70,12 @@ fun GlobalSearchScreen(
     // nothing to hide, so Back leaves the screen at once.
     BackHandler(enabled = historyOpen && showHistory && !state.searchQuery.isNullOrBlank()) { closeHistory() }
     // Fork: scoped glass panels, original Material rendering when disabled.
+    // Fork: the picture of the page the search opened from, behind the history until results come in.
+    DisposableEffect(Unit) { onDispose { GlassSnapshot.clear() } }
     Scaffold(
         // Fork: with glass, the history and the bar share one sheet.
         topBarGlass = !showHistory,
+        background = GlassSnapshot.image.takeIf { showHistory && state.filteredItems.isEmpty() },
         topBar = { scrollBehavior ->
             GlobalSearchToolbar(
                 searchQuery = state.searchQuery,
