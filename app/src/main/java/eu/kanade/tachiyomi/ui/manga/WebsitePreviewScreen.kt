@@ -18,7 +18,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -35,11 +34,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import coil3.ImageLoader
 import coil3.compose.AsyncImage
-import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import eu.kanade.domain.chapter.model.toSChapter
 import eu.kanade.presentation.components.AppBar
+import eu.kanade.presentation.manga.components.rememberWebsitePreviewImageLoader
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.data.preview.WebsiteThumbnail
 import eu.kanade.tachiyomi.source.online.HttpSource
@@ -121,7 +119,14 @@ data class WebsitePreviewScreen(val mangaId: Long) : Screen() {
                         }
                     }
                 }
-                WebsitePreviewGrid(source, source.getChapterUrl(chapter.toSChapter())) { index ->
+                val startUrl = remember(source.id, chapter.id, chapter.url) {
+                    context.appGraph.websitePreviews.startUrl(source, chapter.toSChapter())
+                }
+                if (startUrl == null) {
+                    Text(stringResource(MR.strings.website_previews_unavailable), modifier = Modifier.padding(16.dp))
+                    return@Column
+                }
+                WebsitePreviewGrid(source, startUrl) { index ->
                     context.startActivity(
                         ReaderActivity.newIntent(context, manga.id, chapter.id)
                             // ReaderViewModel already restores this explicit page from its SavedStateHandle.
@@ -149,18 +154,7 @@ private fun WebsitePreviewGridContent(source: HttpSource, initialUrl: String, on
     var nextUrl by remember(initialUrl) { mutableStateOf<String?>(initialUrl) }
     var loading by remember(initialUrl) { mutableStateOf(false) }
     var error by remember(initialUrl) { mutableStateOf<String?>(null) }
-    val imageLoader = remember(source.id, initialUrl) {
-        val client = source.client.newBuilder().addInterceptor { chain ->
-            val request = chain.request().newBuilder()
-            for ((name, value) in source.headers) {
-                if (chain.request().header(name) == null) request.addHeader(name, value)
-            }
-            if (chain.request().header("Referer") == null) request.header("Referer", initialUrl)
-            chain.proceed(request.build())
-        }.build()
-        ImageLoader.Builder(context).components { add(OkHttpNetworkFetcherFactory(callFactory = { client })) }.build()
-    }
-    DisposableEffect(imageLoader) { onDispose { imageLoader.shutdown() } }
+    val imageLoader = rememberWebsitePreviewImageLoader(source, initialUrl)
 
     fun loadNext() {
         val url = nextUrl ?: return
