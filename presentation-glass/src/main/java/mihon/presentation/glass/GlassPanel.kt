@@ -1,19 +1,20 @@
 package mihon.presentation.glass
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 import com.kyant.backdrop.backdrops.LayerBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
@@ -114,47 +115,50 @@ fun Modifier.glassPanel(
 /** The side of a bar that faces the page, the only side with an outline. */
 enum class GlassEdge { Top, Bottom, Start, End }
 
+// How far a bar's glass reaches off the screen: more than the bend of the lens, as in EhViewer.
+private val GlassBleed = 48.dp
+
+/** The corners a bar keeps at both ends of its [GlassEdge], as in EhViewer. */
+val GlassBarCorner = 24.dp
+
 /**
- * Fork: glass for a bar flush with the screen edges (a top bar, the navigation bar): no rounded corners, no shadow
- * and no lit rim, only a hairline on [edge], so the bar merges into the page instead of floating over it.
+ * Fork: Panel glass for a bar along a side of the screen (a top bar, the navigation bar), like `edgeGlass` in EhViewer:
+ * it keeps its rounded corners at both ends of [edge], the side facing the page, while the side facing away reaches
+ * off the screen, so its lit edge, shadow and bend lie outside and the bar melts into the screen there. The two sides
+ * between run along the screen borders.
  */
 @Composable
 fun Modifier.glassBar(
     edge: GlassEdge,
     backdrop: LayerBackdrop? = LocalGlassBackdrop.current,
+    corner: Dp = GlassBarCorner,
 ): Modifier {
     if (backdrop == null || !LocalLiquidGlassEnabled.current) return this
-    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
-    val tint = if (dark) {
-        MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = GlassStyle.Panel.tintAlpha)
-    } else {
-        Color.White.copy(alpha = GlassStyle.Panel.tintAlpha)
+    // A rounded rectangle: the lens of the glass takes no other shape (another one throws on Android 13+).
+    val shape = when (edge) {
+        GlassEdge.Bottom -> RoundedCornerShape(bottomStart = corner, bottomEnd = corner)
+        GlassEdge.Top -> RoundedCornerShape(topStart = corner, topEnd = corner)
+        GlassEdge.Start -> RoundedCornerShape(topStart = corner, bottomStart = corner)
+        GlassEdge.End -> RoundedCornerShape(topEnd = corner, bottomEnd = corner)
     }
-    val line = if (dark) Color.White.copy(alpha = 0.16f) else Color.Black.copy(alpha = 0.10f)
-    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    return drawBackdrop(
-        backdrop = backdrop,
-        shape = { RectangleShape },
-        effects = {
-            vibrancy()
-            blur(4f.dp.toPx())
-        },
-        highlight = null,
-        shadow = null,
-        onDrawSurface = { drawRect(tint) },
-    ).drawWithContent {
-        drawContent()
-        val stroke = 1.dp.toPx()
-        val half = stroke / 2
-        val (start, end) = when (edge) {
-            GlassEdge.Top -> Offset(0f, half) to Offset(size.width, half)
-            GlassEdge.Bottom -> Offset(0f, size.height - half) to Offset(size.width, size.height - half)
-            else -> {
-                val x = if ((edge == GlassEdge.End) != rtl) size.width - half else half
-                Offset(x, 0f) to Offset(x, size.height)
-            }
-        }
-        drawLine(line, start, end, stroke)
+    var left = 0
+    var top = 0
+    var right = 0
+    var bottom = 0
+    return layout { measurable, constraints ->
+        val bleed = GlassBleed.roundToPx()
+        val ltr = layoutDirection == LayoutDirection.Ltr
+        // Only the side facing away from the edge reaches off the screen.
+        left = if ((edge == GlassEdge.End && ltr) || (edge == GlassEdge.Start && !ltr)) bleed else 0
+        right = if ((edge == GlassEdge.Start && ltr) || (edge == GlassEdge.End && !ltr)) bleed else 0
+        top = if (edge == GlassEdge.Bottom) bleed else 0
+        bottom = if (edge == GlassEdge.Top) bleed else 0
+        val placeable = measurable.measure(constraints.offset(left + right, top + bottom))
+        layout(placeable.width - left - right, placeable.height - top - bottom) { placeable.place(-left, -top) }
+    }.glassPanel(shape = shape, style = GlassStyle.Panel, backdrop = backdrop).layout { measurable, constraints ->
+        // The content keeps the bounds of the bar.
+        val placeable = measurable.measure(constraints.offset(-left - right, -top - bottom))
+        layout(placeable.width + left + right, placeable.height + top + bottom) { placeable.place(left, top) }
     }
 }
 
