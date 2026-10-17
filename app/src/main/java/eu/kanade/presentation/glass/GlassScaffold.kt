@@ -37,6 +37,8 @@ fun GlassScaffold(
     bottomBar: @Composable () -> Unit = {},
     snackbarHost: @Composable () -> Unit = {},
     enabled: Boolean = true,
+    // Fork: false while a full-screen glass overlay lies behind the bar, so both read as one sheet.
+    topBarGlass: Boolean = true,
     overlay: @Composable (PaddingValues) -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
@@ -51,8 +53,12 @@ fun GlassScaffold(
                 Box(
                     Modifier.fillMaxWidth().padding(
                         start = navigationPadding.calculateStartPadding(direction),
-                    ).glassPanel(
-                        shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
+                    ).then(
+                        if (topBarGlass) {
+                            Modifier.glassPanel(shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
+                        } else {
+                            Modifier
+                        },
                     ),
                 ) { topBar(behavior) }
             },

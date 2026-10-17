@@ -6,9 +6,13 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -50,14 +54,22 @@ fun GlobalSearchScreen(
     val focused by interaction.collectIsFocusedAsState()
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
+    // Fork: the field loses focus when the keyboard hides; the history stays until it is closed on purpose.
+    var historyOpen by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(focused) { if (focused) historyOpen = true }
     val closeHistory = {
+        historyOpen = false
         focusManager.clearFocus()
         keyboard?.hide()
         Unit
     }
-    BackHandler(enabled = focused) { closeHistory() }
+    val showHistory = state.searchHistory.isNotEmpty() && (historyOpen || state.searchQuery.isNullOrBlank())
+    // Only while the history is on screen: with it emptied, Back leaves the screen at once.
+    BackHandler(enabled = historyOpen && showHistory) { closeHistory() }
     // Fork: scoped glass panels, original Material rendering when disabled.
     Scaffold(
+        // Fork: with glass, the history and the bar share one sheet.
+        topBarGlass = !showHistory,
         topBar = { scrollBehavior ->
             GlobalSearchToolbar(
                 searchQuery = state.searchQuery,
@@ -81,7 +93,7 @@ fun GlobalSearchScreen(
             )
         },
         overlay = { padding ->
-            if (state.searchHistory.isNotEmpty() && (focused || state.searchQuery.isNullOrBlank())) {
+            if (showHistory) {
                 GlobalSearchHistoryOverlay(
                     history = state.searchHistory,
                     contentPadding = padding,

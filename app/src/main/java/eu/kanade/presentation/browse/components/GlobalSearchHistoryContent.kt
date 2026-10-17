@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -47,11 +46,19 @@ internal fun GlobalSearchHistoryOverlay(
     onDelete: (String) -> Unit,
     onClear: () -> Unit,
 ) {
-    val glass = LocalGlassBackdrop.current != null
+    if (LocalGlassBackdrop.current != null) {
+        // Fork: one glass sheet over the whole page, the bar above it without glass of its own, like the expanded
+        // search of EhViewer. The list keeps clear of the bar and the keyboard.
+        Box(Modifier.fillMaxSize().glassPanel(style = GlassStyle.Backdrop)) {
+            Box(Modifier.fillMaxSize().padding(contentPadding).imePadding()) {
+                GlobalSearchHistoryContent(history, PaddingValues(vertical = 12.dp), onClick, onDelete, onClear)
+            }
+        }
+        return
+    }
     Box(
         Modifier.fillMaxSize().padding(contentPadding).imePadding()
-            .glassPanel(shape = RoundedCornerShape(24.dp), style = GlassStyle.Sheet)
-            .background(if (glass) Color.Transparent else MaterialTheme.colorScheme.surface),
+            .background(MaterialTheme.colorScheme.surface),
     ) {
         GlobalSearchHistoryContent(history, PaddingValues(vertical = 12.dp), onClick, onDelete, onClear)
     }
