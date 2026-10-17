@@ -1,6 +1,5 @@
 package eu.kanade.presentation.components
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
@@ -10,21 +9,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -33,6 +30,7 @@ import eu.kanade.presentation.glass.LocalGlassPageContent
 import eu.kanade.presentation.library.components.LibrarySyncProgressBar
 import eu.kanade.tachiyomi.ui.library.rememberLibrarySyncAction
 import kotlinx.coroutines.launch
+import mihon.presentation.glass.LocalGlassBackdrop
 import tachiyomi.presentation.core.components.material.TabText
 import tachiyomi.presentation.core.i18n.stringResource
 import eu.kanade.presentation.glass.GlassScaffold as Scaffold
@@ -50,6 +48,25 @@ fun TabbedScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    val tabRow: @Composable (inGlass: Boolean) -> Unit = { inGlass ->
+        PrimaryTabRow(
+            selectedTabIndex = state.currentPage,
+            modifier = Modifier.zIndex(1f),
+            // Fork: inside the glass header the tabs are part of the glass, without a band of their own.
+            containerColor = if (inGlass) Color.Transparent else TabRowDefaults.primaryContainerColor,
+            divider = { if (!inGlass) HorizontalDivider() },
+        ) {
+            tabs.forEachIndexed { index, tab ->
+                Tab(
+                    selected = state.currentPage == index,
+                    onClick = { scope.launch { state.animateScrollToPage(index) } },
+                    text = { TabText(text = stringResource(tab.titleRes), badgeCount = tab.badgeNumber) },
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
+
     // Fork: scoped glass panels, original Material rendering when disabled.
     Scaffold(
         enabled = glass,
@@ -65,72 +82,42 @@ fun TabbedScreen(
                     onChangeSearchQuery = onChangeSearchQuery,
                     actions = { AppBarActions(tab.actions) },
                 )
+                // Fork: with glass, the tabs belong to the header; the lists scroll below both.
+                if (LocalGlassBackdrop.current != null) tabRow(true)
                 if (showSyncProgress) LibrarySyncProgressBar(rememberLibrarySyncAction())
             }
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { contentPadding ->
         val isGlass = LocalGlassPageContent.current
-        val density = LocalDensity.current
         val layoutDirection = LocalLayoutDirection.current
-        var tabsHeight by remember { mutableStateOf(0.dp) }
-        val tabRow: @Composable () -> Unit = {
-            PrimaryTabRow(
-                selectedTabIndex = state.currentPage,
-                modifier = Modifier.zIndex(1f),
-            ) {
-                tabs.forEachIndexed { index, tab ->
-                    Tab(
-                        selected = state.currentPage == index,
-                        onClick = { scope.launch { state.animateScrollToPage(index) } },
-                        text = { TabText(text = stringResource(tab.titleRes), badgeCount = tab.badgeNumber) },
-                        unselectedContentColor = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
-        }
-        Box(Modifier.fillMaxSize()) {
-            Column(
-                modifier = if (isGlass) {
-                    Modifier.fillMaxSize()
-                } else {
-                    Modifier.padding(
-                        top = contentPadding.calculateTopPadding(),
-                        start = contentPadding.calculateStartPadding(layoutDirection),
-                        end = contentPadding.calculateEndPadding(layoutDirection),
-                    )
-                },
-            ) {
-                if (!isGlass) tabRow()
+        Column(
+            modifier = if (isGlass) {
+                Modifier.fillMaxSize()
+            } else {
+                Modifier.padding(
+                    top = contentPadding.calculateTopPadding(),
+                    start = contentPadding.calculateStartPadding(layoutDirection),
+                    end = contentPadding.calculateEndPadding(layoutDirection),
+                )
+            },
+        ) {
+            if (!isGlass) tabRow(false)
 
-                HorizontalPager(
-                    modifier = Modifier.fillMaxSize(),
-                    state = state,
-                    verticalAlignment = Alignment.Top,
-                ) { page ->
-                    tabs[page].content(
-                        PaddingValues(
-                            top = if (isGlass) contentPadding.calculateTopPadding() + tabsHeight else 0.dp,
-                            start = if (isGlass) {
-                                contentPadding.calculateStartPadding(layoutDirection)
-                            } else {
-                                0.dp
-                            },
-                            end = if (isGlass) contentPadding.calculateEndPadding(layoutDirection) else 0.dp,
-                            bottom = contentPadding.calculateBottomPadding(),
-                        ),
-                        snackbarHostState,
-                    )
-                }
-            }
-            if (isGlass) {
-                Box(
-                    Modifier.padding(
-                        top = contentPadding.calculateTopPadding(),
-                        start = contentPadding.calculateStartPadding(layoutDirection),
-                        end = contentPadding.calculateEndPadding(layoutDirection),
-                    ).onSizeChanged { tabsHeight = with(density) { it.height.toDp() } },
-                ) { tabRow() }
+            HorizontalPager(
+                modifier = Modifier.fillMaxSize(),
+                state = state,
+                verticalAlignment = Alignment.Top,
+            ) { page ->
+                tabs[page].content(
+                    PaddingValues(
+                        top = if (isGlass) contentPadding.calculateTopPadding() else 0.dp,
+                        start = if (isGlass) contentPadding.calculateStartPadding(layoutDirection) else 0.dp,
+                        end = if (isGlass) contentPadding.calculateEndPadding(layoutDirection) else 0.dp,
+                        bottom = contentPadding.calculateBottomPadding(),
+                    ),
+                    snackbarHostState,
+                )
             }
         }
     }
