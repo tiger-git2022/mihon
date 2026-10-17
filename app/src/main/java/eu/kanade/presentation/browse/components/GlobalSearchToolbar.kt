@@ -34,6 +34,7 @@ import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.rounded.DoneAll
 import mihon.icons.materialsymbols.rounded.FilterList
 import mihon.icons.materialsymbols.rounded.Keep
+import mihon.presentation.glass.LocalGlassBackdrop
 import mihon.presentation.glass.glassContainerColor
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.padding
@@ -139,7 +140,8 @@ fun GlobalSearchToolbar(
             )
         }
 
-        HorizontalDivider()
+        // Fork: with glass, no line between the chips and the history or results below.
+        if (LocalGlassBackdrop.current == null) HorizontalDivider()
         LibrarySyncProgressBar(rememberLibrarySyncAction()) // Fork: live sync progress
     }
 }

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -18,9 +17,10 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
+import mihon.presentation.glass.GlassEdge
 import mihon.presentation.glass.LocalGlassBackdrop
+import mihon.presentation.glass.glassBar
 import mihon.presentation.glass.glassContent
-import mihon.presentation.glass.glassPanel
 import mihon.presentation.glass.rememberGlassBackdrop
 import tachiyomi.presentation.core.components.material.Scaffold
 
@@ -36,6 +36,7 @@ fun GlassScaffold(
     topBar: @Composable (TopAppBarScrollBehavior) -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
     snackbarHost: @Composable () -> Unit = {},
+    floatingActionButton: @Composable () -> Unit = {},
     enabled: Boolean = true,
     // Fork: false while a full-screen glass overlay lies behind the bar, so both read as one sheet.
     topBarGlass: Boolean = true,
@@ -54,8 +55,9 @@ fun GlassScaffold(
                     Modifier.fillMaxWidth().padding(
                         start = navigationPadding.calculateStartPadding(direction),
                     ).then(
+                        // Fork: flush with the screen, only the edge facing the page is outlined.
                         if (topBarGlass) {
-                            Modifier.glassPanel(shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
+                            Modifier.glassBar(GlassEdge.Bottom)
                         } else {
                             Modifier
                         },
@@ -63,6 +65,7 @@ fun GlassScaffold(
                 ) { topBar(behavior) }
             },
             bottomBar = bottomBar,
+            floatingActionButton = floatingActionButton,
             // Fork: notifications must stay above the bar and beside the rail, like the page content.
             snackbarHost = { Box(Modifier.padding(navigationPadding)) { snackbarHost() } },
         ) { padding ->

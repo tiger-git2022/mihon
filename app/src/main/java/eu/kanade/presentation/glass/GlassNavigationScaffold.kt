@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuite
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteColors
@@ -31,9 +30,10 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import mihon.presentation.glass.GlassEdge
 import mihon.presentation.glass.LocalLiquidGlassEnabled
+import mihon.presentation.glass.glassBar
 import mihon.presentation.glass.glassContent
-import mihon.presentation.glass.glassPanel
 import mihon.presentation.glass.rememberGlassBackdrop
 
 /** Fork: glass navigation floats over the home pages; the disabled branch is the upstream scaffold. */
@@ -88,15 +88,13 @@ fun GlassNavigationScaffold(
             visible = visible,
             modifier = Modifier.align(if (rail) Alignment.CenterStart else Alignment.BottomCenter),
         ) {
+            // Fork: flush with the screen edge, only the side facing the page is outlined.
             Box(
                 Modifier.onSizeChanged { size = it }
-                    .then(if (rail) Modifier.fillMaxHeight() else Modifier.fillMaxWidth())
-                    .padding(
-                        if (rail) PaddingValues(8.dp) else PaddingValues(start = 12.dp, end = 12.dp, bottom = 8.dp),
-                    ),
+                    .then(if (rail) Modifier.fillMaxHeight() else Modifier.fillMaxWidth()),
             ) {
                 NavigationSuite(
-                    modifier = Modifier.glassPanel(RoundedCornerShape(28.dp), backdrop = backdrop),
+                    modifier = Modifier.glassBar(if (rail) GlassEdge.End else GlassEdge.Top, backdrop = backdrop),
                     navigationSuiteType = navigationSuiteType,
                     colors = NavigationSuiteDefaults.colors(
                         navigationBarContainerColor = Color.Transparent,

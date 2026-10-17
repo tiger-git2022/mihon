@@ -1,6 +1,7 @@
 # 网站页面预览 / Website page previews
 
-入口：漫画详情简介下方的 **页面预览** 一排小图（前 20 张），点小图从那一页开始阅读，**全部** 打开完整网格。
+入口：漫画详情章节列表下方的 **页面预览**，和 EhViewer 画廊详情一样往下排成网格，显示前 20 页，
+下面的 **查看全部** 打开完整网格。点小图从那一页开始阅读。标题右边可选 2–6 列，详情和完整网格共用这个列数。
 只有成功取得网站逐页缩略图后才显示，其他漫画的详情不变。
 目前接入 **绅士漫画（WNACG）**（包括使用同一网页结构的镜像域名）和 **HentaiHand**。
 完整网格按网站顺序展示分页缩略图，滚动到底继续加载；多个章节可切换，点缩略图从对应页开始阅读。
@@ -35,8 +36,8 @@
 
 ## English
 
-WNACG and HentaiHand show a strip of page previews below the description once actual server thumbnails have been
-retrieved; tapping one opens the reader at that page and "All" opens the full grid. The grid paginates on demand and
+WNACG and HentaiHand show a grid of the first 20 page previews below the chapters once actual server thumbnails have
+been retrieved, with a 2–6 column choice; tapping one opens the reader at that page and "Show all" opens the full grid. The grid paginates on demand and
 supports chapter selection. HentaiHand's page list already carries a `thumbnail_url` for every page. PandaChaika,
 Picacomic and JM are skipped because no usable separate page-thumbnail interface was established.
 Original images are never fetched to manufacture thumbnails, and previewing does not change reading progress.

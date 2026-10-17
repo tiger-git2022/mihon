@@ -4,11 +4,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.backdrops.LayerBackdrop
 import com.kyant.backdrop.drawBackdrop
@@ -105,6 +109,53 @@ fun Modifier.glassPanel(
         shadow = shadow?.let { { it } },
         onDrawSurface = { drawRect(tint) },
     )
+}
+
+/** The side of a bar that faces the page, the only side with an outline. */
+enum class GlassEdge { Top, Bottom, Start, End }
+
+/**
+ * Fork: glass for a bar flush with the screen edges (a top bar, the navigation bar): no rounded corners, no shadow
+ * and no lit rim, only a hairline on [edge], so the bar merges into the page instead of floating over it.
+ */
+@Composable
+fun Modifier.glassBar(
+    edge: GlassEdge,
+    backdrop: LayerBackdrop? = LocalGlassBackdrop.current,
+): Modifier {
+    if (backdrop == null || !LocalLiquidGlassEnabled.current) return this
+    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val tint = if (dark) {
+        MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = GlassStyle.Panel.tintAlpha)
+    } else {
+        Color.White.copy(alpha = GlassStyle.Panel.tintAlpha)
+    }
+    val line = if (dark) Color.White.copy(alpha = 0.16f) else Color.Black.copy(alpha = 0.10f)
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    return drawBackdrop(
+        backdrop = backdrop,
+        shape = { RectangleShape },
+        effects = {
+            vibrancy()
+            blur(4f.dp.toPx())
+        },
+        highlight = null,
+        shadow = null,
+        onDrawSurface = { drawRect(tint) },
+    ).drawWithContent {
+        drawContent()
+        val stroke = 1.dp.toPx()
+        val half = stroke / 2
+        val (start, end) = when (edge) {
+            GlassEdge.Top -> Offset(0f, half) to Offset(size.width, half)
+            GlassEdge.Bottom -> Offset(0f, size.height - half) to Offset(size.width, size.height - half)
+            else -> {
+                val x = if ((edge == GlassEdge.End) != rtl) size.width - half else half
+                Offset(x, 0f) to Offset(x, size.height)
+            }
+        }
+        drawLine(line, start, end, stroke)
+    }
 }
 
 /** Original colors everywhere except inside an opted-in panel. */

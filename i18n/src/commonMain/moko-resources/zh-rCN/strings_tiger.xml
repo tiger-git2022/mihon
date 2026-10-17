@@ -5,7 +5,8 @@
     <string name="website_preview_page_number">第 %d 页</string>
     <string name="website_previews_unavailable">此网站未提供可用的逐页缩略图。</string>
     <string name="website_previews_no_chapters">请先返回刷新章节列表，再打开页面预览。</string>
-    <string name="website_previews_show_all">全部</string>
+    <string name="website_previews_show_all">查看全部</string>
+    <string name="website_previews_columns">%d 列</string>
 
     <!-- Glass components -->
     <string name="pref_liquid_glass">液态玻璃</string>
