@@ -110,4 +110,15 @@
     <string name="search_card_width_narrow">窄</string>
     <string name="search_card_width_medium">中</string>
     <string name="search_card_width_wide">宽</string>
+
+    <!-- 玻璃模糊度和不透明度 -->
+    <string name="pref_glass_tuning">玻璃的模糊度和不透明度</string>
+    <string name="pref_glass_bar_blur">顶栏和底栏：模糊度</string>
+    <string name="pref_glass_bar_opacity">顶栏和底栏：不透明度</string>
+    <string name="pref_glass_opacity_summary">顶栏、底部导航和同步进度。越低越通透，越高越实。</string>
+    <string name="pref_glass_overlay_blur">整屏玻璃：模糊度</string>
+    <string name="pref_glass_overlay_summary">盖住整个页面的玻璃，比如搜索历史。</string>
+    <string name="pref_glass_overlay_opacity">整屏玻璃：不透明度</string>
+    <string name="pref_glass_blur_value">%d dp</string>
+    <string name="pref_glass_reset">恢复默认的模糊度和不透明度</string>
 </resources>
