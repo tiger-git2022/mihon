@@ -117,11 +117,8 @@ class MangaScreen(
             onDownloadChapter = viewModel::runChapterDownloadActions.takeIf { !successState.source.isLocalOrStub() },
             downloadProgressProvider = viewModel::getDownloadProgress,
             onAddToLibraryClicked = {
-                if (successState.manga.favorite) {
-                    viewModel.showRemoveFromLibraryDialog()
-                } else {
-                    viewModel.toggleFavorite()
-                }
+                // Fork: removes from the library without asking first
+                viewModel.toggleFavorite()
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
             },
             onWebViewClicked = {

@@ -1,6 +1,5 @@
 package eu.kanade.presentation.components
 
-import androidx.compose.animation.core.animate
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -14,13 +13,12 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Velocity
 import kotlin.math.roundToInt
 
 /**
- * Fork: part of a top bar (the filter chips) that slides away while the page scrolls down and comes back as soon as
- * it scrolls up, keeping the pinned bar small. Give [connection] to the page's scroll container (the scaffold's
- * modifier) and [Modifier.collapsingHeader] to the part that collapses.
+ * Fork: part of a top bar (the filter chips) that slides away while the page scrolls down and comes back only once
+ * the page is back at its top, keeping the pinned bar small. Give [connection] to the page's scroll container (the
+ * scaffold's modifier) and [Modifier.collapsingHeader] to the part that collapses.
  */
 @Stable
 class CollapsingHeaderState {
@@ -31,20 +29,23 @@ class CollapsingHeaderState {
     internal var height by mutableFloatStateOf(0f)
 
     val connection: NestedScrollConnection = object : NestedScrollConnection {
+        // Scrolling down hides the header before the page moves
         override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-            val old = offset
-            offset = (offset + available.y).coerceIn(-height, 0f)
-            return Offset(0f, offset - old)
+            if (available.y >= 0f) return Offset.Zero
+            return Offset(0f, slide(available.y))
         }
 
-        override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-            // Never left half shown
-            if (offset < 0f && offset > -height) {
-                val target = if (offset < -height / 2) -height else 0f
-                animate(offset, target) { value, _ -> offset = value.coerceIn(-height, 0f) }
-            }
-            return Velocity.Zero
+        // Scrolling up shows it only with what the page could not take, that is at the page's top
+        override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+            if (available.y <= 0f) return Offset.Zero
+            return Offset(0f, slide(available.y))
         }
+    }
+
+    private fun slide(delta: Float): Float {
+        val old = offset
+        offset = (offset + delta).coerceIn(-height, 0f)
+        return offset - old
     }
 
     fun show() {

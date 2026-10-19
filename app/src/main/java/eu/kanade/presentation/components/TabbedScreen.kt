@@ -82,9 +82,10 @@ fun TabbedScreen(
                     onChangeSearchQuery = onChangeSearchQuery,
                     actions = { AppBarActions(tab.actions) },
                 )
+                // Fork: sync progress right below the toolbar, above the tabs, so it never meets their indicator
+                if (showSyncProgress) LibrarySyncProgressBar(rememberLibrarySyncAction())
                 // Fork: with glass, the tabs belong to the header; the lists scroll below both.
                 if (LocalGlassBackdrop.current != null) tabRow(true)
-                if (showSyncProgress) LibrarySyncProgressBar(rememberLibrarySyncAction())
             }
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
