@@ -92,6 +92,7 @@ fun MangaCompactGridItem(
                         .fillMaxWidth()
                         .alpha(if (isSelected) GRID_SELECTED_COVER_ALPHA else coverAlpha),
                     data = coverData,
+                    ratio = LocalMangaGridStyle.current.coverRatio, // Fork: cover height setting
                 )
             },
             badgesStart = coverBadgeStart,
@@ -138,8 +139,27 @@ private fun BoxScope.CoverTextOverlay(
             .fillMaxWidth()
             .align(Alignment.BottomCenter),
     )
+    // Fork: more title lines than the shade covers get a shade of their own
+    val maxLines = LocalMangaGridStyle.current.maxLines(2)
     Row(
-        modifier = Modifier.align(Alignment.BottomStart),
+        modifier = Modifier
+            .align(Alignment.BottomStart)
+            .then(
+                if (maxLines > 2) {
+                    Modifier
+                        .clip(RoundedCornerShape(bottomStart = 4.dp, bottomEnd = 4.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                0f to Color.Transparent,
+                                0.35f to Color(0x88000000),
+                                1f to Color(0xAA000000),
+                            ),
+                        )
+                        .padding(top = 16.dp)
+                } else {
+                    Modifier
+                },
+            ),
         verticalAlignment = Alignment.Bottom,
     ) {
         GridItemTitle(
@@ -155,6 +175,7 @@ private fun BoxScope.CoverTextOverlay(
                 ),
             ),
             minLines = 1,
+            maxLines = maxLines,
         )
         if (onClickContinueReading != null) {
             ContinueReadingButton(
@@ -199,6 +220,7 @@ fun MangaComfortableGridItem(
                             .fillMaxWidth()
                             .alpha(if (isSelected) GRID_SELECTED_COVER_ALPHA else coverAlpha),
                         data = coverData,
+                        ratio = LocalMangaGridStyle.current.coverRatio, // Fork: cover height setting
                     )
                 },
                 badgesStart = coverBadgeStart,
@@ -221,7 +243,7 @@ fun MangaComfortableGridItem(
                 title = title,
                 style = MaterialTheme.typography.titleSmall,
                 minLines = 2,
-                maxLines = titleMaxLines,
+                maxLines = LocalMangaGridStyle.current.maxLines(titleMaxLines), // Fork: title lines setting
             )
         }
     }
@@ -241,7 +263,7 @@ private fun MangaGridCover(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(MangaCover.Book.ratio),
+            .aspectRatio(LocalMangaGridStyle.current.coverRatio), // Fork: cover height setting
     ) {
         cover()
         content?.invoke(this)
@@ -339,6 +361,23 @@ fun MangaListItem(
     coverAlpha: Float = 1f,
     onClickContinueReading: (() -> Unit)? = null,
 ) {
+    // Fork: large rows like EhViewer's when browsing a source
+    val style = LocalMangaGridStyle.current
+    if (style.largeList) {
+        MangaWideItem(
+            coverData = coverData,
+            title = title,
+            onClick = onClick,
+            onLongClick = onLongClick,
+            coverWidth = 88.dp,
+            titleMaxLines = style.maxLines(Int.MAX_VALUE),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            isSelected = isSelected,
+            coverAlpha = coverAlpha,
+            badge = badge,
+        )
+        return
+    }
     Row(
         modifier = Modifier
             .selectedBackground(isSelected)

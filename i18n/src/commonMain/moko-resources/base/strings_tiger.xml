@@ -100,4 +100,24 @@
     <string name="ehviewer_search_artist">Search %1$s in EhViewer</string>
     <string name="ehviewer_not_installed">EhViewer is not installed</string>
     <string name="global_search_alternative_query">Found as “%1$s”</string>
+
+    <!-- Covers and titles -->
+    <string name="grid_settings">Covers and titles</string>
+    <string name="grid_title_lines">Title lines</string>
+    <string name="grid_title_lines_all">Whole title</string>
+    <string name="grid_columns_portrait">Covers per row (portrait)</string>
+    <string name="grid_columns_landscape">Covers per row (landscape)</string>
+    <string name="grid_columns_library">As in the library</string>
+    <string name="grid_cover_height">Cover height</string>
+    <string name="grid_compact_hint">In the compact grid the title lies over the cover; for long titles choose the comfortable grid or the list.</string>
+    <string name="browse_list_style">List</string>
+    <string name="browse_list_large">Large rows, title beside the cover</string>
+    <string name="browse_list_small">Small rows</string>
+    <string name="search_card_style">Cards</string>
+    <string name="search_card_wide">Wide, title beside the cover</string>
+    <string name="search_card_tall">Tall, title below the cover</string>
+    <string name="search_card_width">Card width</string>
+    <string name="search_card_width_narrow">Narrow</string>
+    <string name="search_card_width_medium">Medium</string>
+    <string name="search_card_width_wide">Wide</string>
 </resources>

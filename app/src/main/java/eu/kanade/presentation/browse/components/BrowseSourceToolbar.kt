@@ -1,5 +1,7 @@
 package eu.kanade.presentation.browse.components
 
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
@@ -37,6 +39,8 @@ fun BrowseSourceToolbar(
     onSettingsClick: () -> Unit,
     onSearch: (String) -> Unit,
     scrollBehavior: TopAppBarScrollBehavior? = null,
+    // Fork: covers and titles settings
+    onGridSettingsClick: (() -> Unit)? = null,
 ) {
     // Avoid capturing unstable source in actions lambda
     val title = source?.name
@@ -118,6 +122,16 @@ fun BrowseSourceToolbar(
                 ) {
                     selectingDisplayMode = false
                     onDisplayModeChange(LibraryDisplayMode.List)
+                }
+                if (onGridSettingsClick != null) {
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text(text = stringResource(MR.strings.grid_settings)) },
+                        onClick = {
+                            selectingDisplayMode = false
+                            onGridSettingsClick()
+                        },
+                    )
                 }
             }
         },

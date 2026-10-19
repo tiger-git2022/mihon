@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -107,32 +108,39 @@ fun LibraryContent(
                     }
                 },
             ) {
-                LibraryPager(
-                    state = pagerState,
-                    contentPadding = PaddingValues(
-                        top = if (glass) contentPadding.calculateTopPadding() + tabsHeight else 0.dp,
-                        start = if (glass) contentPadding.calculateStartPadding(LocalLayoutDirection.current) else 0.dp,
-                        end = if (glass) contentPadding.calculateEndPadding(LocalLayoutDirection.current) else 0.dp,
-                        bottom = contentPadding.calculateBottomPadding(),
-                    ),
-                    hasActiveFilters = hasActiveFilters,
-                    selection = selection,
-                    searchQuery = searchQuery,
-                    onGlobalSearchClicked = onGlobalSearchClicked,
-                    getCategoryForPage = { page -> categories[page] },
-                    getDisplayMode = getDisplayMode,
-                    getColumnsForOrientation = getColumnsForOrientation,
-                    getItemsForCategory = getItemsForCategory,
-                    onClickManga = { category, manga ->
-                        if (selection.isNotEmpty()) {
-                            onToggleSelection(category, manga)
-                        } else {
-                            onClickManga(manga.manga.id)
-                        }
-                    },
-                    onLongClickManga = onToggleRangeSelection,
-                    onClickContinueReading = onContinueReadingClicked,
-                )
+                // Fork: title lines setting
+                CompositionLocalProvider(LocalMangaGridStyle provides rememberLibraryGridStyle()) {
+                    LibraryPager(
+                        state = pagerState,
+                        contentPadding = PaddingValues(
+                            top = if (glass) contentPadding.calculateTopPadding() + tabsHeight else 0.dp,
+                            start = if (glass) {
+                                contentPadding.calculateStartPadding(LocalLayoutDirection.current)
+                            } else {
+                                0.dp
+                            },
+                            end = if (glass) contentPadding.calculateEndPadding(LocalLayoutDirection.current) else 0.dp,
+                            bottom = contentPadding.calculateBottomPadding(),
+                        ),
+                        hasActiveFilters = hasActiveFilters,
+                        selection = selection,
+                        searchQuery = searchQuery,
+                        onGlobalSearchClicked = onGlobalSearchClicked,
+                        getCategoryForPage = { page -> categories[page] },
+                        getDisplayMode = getDisplayMode,
+                        getColumnsForOrientation = getColumnsForOrientation,
+                        getItemsForCategory = getItemsForCategory,
+                        onClickManga = { category, manga ->
+                            if (selection.isNotEmpty()) {
+                                onToggleSelection(category, manga)
+                            } else {
+                                onClickManga(manga.manga.id)
+                            }
+                        },
+                        onLongClickManga = onToggleRangeSelection,
+                        onClickContinueReading = onContinueReadingClicked,
+                    )
+                }
             }
 
             LaunchedEffect(pagerState.currentPage) {
