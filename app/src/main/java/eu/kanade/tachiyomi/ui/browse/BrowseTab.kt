@@ -74,8 +74,7 @@ data object BrowseTab : Tab {
 
         TabbedScreen(
             titleRes = MR.strings.browse,
-            glass = true, // Fork: glass header and progress in Browse
-            showSyncProgress = true,
+            glass = true, // Fork: glass header in Browse; its sync circle stands for the progress row
             tabs = tabs,
             state = state,
             searchQuery = extensionsSearchQuery,
