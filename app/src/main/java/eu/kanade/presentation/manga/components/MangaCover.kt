@@ -27,6 +27,8 @@ enum class MangaCover(val ratio: Float) {
         contentDescription: String = "",
         shape: Shape = MaterialTheme.shapes.extraSmall,
         onClick: (() -> Unit)? = null,
+        // Fork: grids may show shorter, cropped covers
+        ratio: Float = this.ratio,
     ) {
         AsyncImage(
             model = data,

@@ -5,7 +5,10 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -15,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import eu.kanade.presentation.browse.components.GlobalSearchCardRow
@@ -23,13 +27,19 @@ import eu.kanade.presentation.browse.components.GlobalSearchHistoryOverlay
 import eu.kanade.presentation.browse.components.GlobalSearchLoadingResultItem
 import eu.kanade.presentation.browse.components.GlobalSearchResultItem
 import eu.kanade.presentation.browse.components.GlobalSearchToolbar
+import eu.kanade.presentation.browse.components.MangaGridSettingsSheet
+import eu.kanade.presentation.components.rememberCollapsingHeaderState
 import eu.kanade.presentation.glass.GlassSnapshot
+import eu.kanade.presentation.library.components.LocalMangaGridStyle
+import eu.kanade.presentation.library.components.rememberSearchGridStyle
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SearchItemResult
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SearchViewModel
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SourceFilter
 import eu.kanade.tachiyomi.ui.library.LibrarySyncActions
 import eu.kanade.tachiyomi.util.system.LocaleHelper
+import mihon.icons.materialsymbols.MaterialSymbols
+import mihon.icons.materialsymbols.roundedfilled.ViewModule
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
@@ -72,7 +82,11 @@ fun GlobalSearchScreen(
     // Fork: scoped glass panels, original Material rendering when disabled.
     // Fork: the picture of the page the search opened from, behind the history until results come in.
     DisposableEffect(Unit) { onDispose { GlassSnapshot.clear() } }
+    // Fork: the chips slide away while the results scroll down; covers and titles settings
+    val chipsState = rememberCollapsingHeaderState()
+    var showGridSettings by rememberSaveable { mutableStateOf(false) }
     Scaffold(
+        modifier = Modifier.nestedScroll(chipsState.connection),
         // Fork: with glass, the history and the bar share one sheet.
         topBarGlass = !showHistory,
         background = GlassSnapshot.image.takeIf { showHistory && state.filteredItems.isEmpty() },
@@ -94,8 +108,17 @@ fun GlobalSearchScreen(
                 onlyShowHasResults = state.onlyShowHasResults,
                 onToggleResults = onToggleResults,
                 scrollBehavior = scrollBehavior,
-                // Fork: OneDrive sync state right of the search field
-                actions = { LibrarySyncActions() },
+                // Fork: covers and titles settings, OneDrive sync state right of the search field
+                actions = {
+                    IconButton(onClick = { showGridSettings = true }) {
+                        Icon(
+                            imageVector = MaterialSymbols.RoundedFilled.ViewModule,
+                            contentDescription = stringResource(MR.strings.grid_settings),
+                        )
+                    }
+                    LibrarySyncActions()
+                },
+                chipsState = chipsState,
             )
         },
         overlay = { padding ->
@@ -123,6 +146,9 @@ fun GlobalSearchScreen(
             onLongClickItem = onLongClickItem,
         )
     }
+    if (showGridSettings) {
+        MangaGridSettingsSheet(onDismissRequest = { showGridSettings = false }, browse = false, search = true)
+    }
 }
 
 @Composable
@@ -135,37 +161,40 @@ internal fun GlobalSearchContent(
     onLongClickItem: (Manga) -> Unit,
     fromSourceId: Long? = null,
 ) {
-    LazyColumn(
-        contentPadding = contentPadding,
-    ) {
-        items.forEach { (source, result) ->
-            item(key = source.id) {
-                GlobalSearchResultItem(
-                    title = fromSourceId?.let {
-                        "▶ ${source.name}".takeIf { source.id == fromSourceId }
-                    } ?: source.name,
-                    subtitle = LocaleHelper.getLocalizedDisplayName(source.lang) +
-                        // Fork: searched again with the other spelling of the name
-                        (result as? SearchItemResult.Success)?.foundAs
-                            ?.let { " · " + stringResource(MR.strings.global_search_alternative_query, it) }
-                            .orEmpty(),
-                    onClick = { onClickSource(source) },
-                    modifier = Modifier.animateItem(),
-                ) {
-                    when (result) {
-                        SearchItemResult.Loading -> {
-                            GlobalSearchLoadingResultItem()
-                        }
-                        is SearchItemResult.Success -> {
-                            GlobalSearchCardRow(
-                                titles = result.result,
-                                getManga = getManga,
-                                onClick = onClickItem,
-                                onLongClick = onLongClickItem,
-                            )
-                        }
-                        is SearchItemResult.Error -> {
-                            GlobalSearchErrorResultItem(message = result.throwable.message)
+    // Fork: card style and title lines setting
+    CompositionLocalProvider(LocalMangaGridStyle provides rememberSearchGridStyle()) {
+        LazyColumn(
+            contentPadding = contentPadding,
+        ) {
+            items.forEach { (source, result) ->
+                item(key = source.id) {
+                    GlobalSearchResultItem(
+                        title = fromSourceId?.let {
+                            "▶ ${source.name}".takeIf { source.id == fromSourceId }
+                        } ?: source.name,
+                        subtitle = LocaleHelper.getLocalizedDisplayName(source.lang) +
+                            // Fork: searched again with the other spelling of the name
+                            (result as? SearchItemResult.Success)?.foundAs
+                                ?.let { " · " + stringResource(MR.strings.global_search_alternative_query, it) }
+                                .orEmpty(),
+                        onClick = { onClickSource(source) },
+                        modifier = Modifier.animateItem(),
+                    ) {
+                        when (result) {
+                            SearchItemResult.Loading -> {
+                                GlobalSearchLoadingResultItem()
+                            }
+                            is SearchItemResult.Success -> {
+                                GlobalSearchCardRow(
+                                    titles = result.result,
+                                    getManga = getManga,
+                                    onClick = onClickItem,
+                                    onLongClick = onLongClickItem,
+                                )
+                            }
+                            is SearchItemResult.Error -> {
+                                GlobalSearchErrorResultItem(message = result.throwable.message)
+                            }
                         }
                     }
                 }

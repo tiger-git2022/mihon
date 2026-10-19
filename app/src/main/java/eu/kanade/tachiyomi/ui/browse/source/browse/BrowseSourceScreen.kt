@@ -17,13 +17,18 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -34,9 +39,15 @@ import dev.zacsweers.metrox.viewmodel.assistedMetroViewModel
 import eu.kanade.presentation.browse.BrowseSourceContent
 import eu.kanade.presentation.browse.MissingSourceScreen
 import eu.kanade.presentation.browse.components.BrowseSourceToolbar
+import eu.kanade.presentation.browse.components.MangaGridSettingsSheet
 import eu.kanade.presentation.browse.components.RemoveMangaDialog
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
+import eu.kanade.presentation.components.collapsingHeader
+import eu.kanade.presentation.components.rememberCollapsingHeaderState
 import eu.kanade.presentation.library.components.LibrarySyncProgressBar
+import eu.kanade.presentation.library.components.LocalMangaGridStyle
+import eu.kanade.presentation.library.components.browseGridColumns
+import eu.kanade.presentation.library.components.rememberBrowseGridStyle
 import eu.kanade.presentation.manga.DuplicateMangaDialog
 import eu.kanade.presentation.util.AssistContentScreen
 import eu.kanade.presentation.util.Screen
@@ -128,8 +139,14 @@ data class BrowseSourceScreen(
             assistUrl = (source as? HttpSource)?.getHomeUrl()
         }
 
+        // Fork: the chips slide away while the page scrolls down; covers and titles settings
+        val chipsState = rememberCollapsingHeaderState()
+        var showGridSettings by rememberSaveable { mutableStateOf(false) }
+        LaunchedEffect(state.listing) { chipsState.show() }
+
         // Fork: scoped glass panels, original Material rendering when disabled.
         Scaffold(
+            modifier = Modifier.nestedScroll(chipsState.connection),
             topBar = {
                 Column(
                     modifier = Modifier
@@ -147,10 +164,14 @@ data class BrowseSourceScreen(
                         onHelpClick = onHelpClick,
                         onSettingsClick = { navigator.push(SourcePreferencesScreen(sourceId)) },
                         onSearch = viewModel::search,
+                        onGridSettingsClick = { showGridSettings = true },
                     )
+                    // Fork: sync progress right below the toolbar, the chips below it
+                    LibrarySyncProgressBar(rememberLibrarySyncAction())
 
                     Row(
                         modifier = Modifier
+                            .collapsingHeader(chipsState)
                             .horizontalScroll(rememberScrollState())
                             .padding(horizontal = MaterialTheme.padding.small),
                         horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
@@ -213,36 +234,42 @@ data class BrowseSourceScreen(
                     }
 
                     HorizontalDivider()
-                    LibrarySyncProgressBar(rememberLibrarySyncAction()) // Fork: progress while browsing
                 }
             },
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         ) { paddingValues ->
-            BrowseSourceContent(
-                source = source,
-                mangaList = viewModel.mangaPagerFlowFlow.collectAsLazyPagingItems(),
-                columns = viewModel.getColumnsPreference(LocalConfiguration.current.orientation),
-                displayMode = viewModel.displayMode,
-                snackbarHostState = snackbarHostState,
-                contentPadding = paddingValues,
-                onWebViewClick = onWebViewClick,
-                onHelpClick = { uriHandler.openUri(Constants.URL_HELP) },
-                onLocalSourceHelpClick = onHelpClick,
-                onMangaClick = { navigator.push((MangaScreen(it.id, true))) },
-                onMangaLongClick = { manga ->
-                    scope.launch(Dispatchers.IO) {
-                        val duplicates = viewModel.getDuplicateLibraryManga(manga)
-                        when {
-                            manga.favorite -> viewModel.setDialog(BrowseSourceViewModel.Dialog.RemoveManga(manga))
-                            duplicates.isNotEmpty() -> viewModel.setDialog(
-                                BrowseSourceViewModel.Dialog.AddDuplicateManga(manga, duplicates),
-                            )
-                            else -> viewModel.addFavorite(manga)
+            // Fork: covers and titles setting
+            CompositionLocalProvider(LocalMangaGridStyle provides rememberBrowseGridStyle()) {
+                BrowseSourceContent(
+                    source = source,
+                    mangaList = viewModel.mangaPagerFlowFlow.collectAsLazyPagingItems(),
+                    columns = browseGridColumns(viewModel.getColumnsPreference(LocalConfiguration.current.orientation)),
+                    displayMode = viewModel.displayMode,
+                    snackbarHostState = snackbarHostState,
+                    contentPadding = paddingValues,
+                    onWebViewClick = onWebViewClick,
+                    onHelpClick = { uriHandler.openUri(Constants.URL_HELP) },
+                    onLocalSourceHelpClick = onHelpClick,
+                    onMangaClick = { navigator.push((MangaScreen(it.id, true))) },
+                    onMangaLongClick = { manga ->
+                        scope.launch(Dispatchers.IO) {
+                            val duplicates = viewModel.getDuplicateLibraryManga(manga)
+                            when {
+                                manga.favorite -> viewModel.setDialog(BrowseSourceViewModel.Dialog.RemoveManga(manga))
+                                duplicates.isNotEmpty() -> viewModel.setDialog(
+                                    BrowseSourceViewModel.Dialog.AddDuplicateManga(manga, duplicates),
+                                )
+                                else -> viewModel.addFavorite(manga)
+                            }
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         }
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    }
-                },
-            )
+                    },
+                )
+            }
+        }
+
+        if (showGridSettings) {
+            MangaGridSettingsSheet(onDismissRequest = { showGridSettings = false }, browse = true, search = false)
         }
 
         val onDismissRequest = { viewModel.setDialog(null) }

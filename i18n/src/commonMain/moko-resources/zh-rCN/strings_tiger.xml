@@ -90,4 +90,24 @@
     <string name="ehviewer_search_artist">在 EhViewer 中搜索「%1$s」</string>
     <string name="ehviewer_not_installed">没有安装 EhViewer</string>
     <string name="global_search_alternative_query">用「%1$s」搜到</string>
+
+    <!-- 封面和标题 -->
+    <string name="grid_settings">封面和标题</string>
+    <string name="grid_title_lines">标题行数</string>
+    <string name="grid_title_lines_all">完整标题</string>
+    <string name="grid_columns_portrait">每行几本（竖屏）</string>
+    <string name="grid_columns_landscape">每行几本（横屏）</string>
+    <string name="grid_columns_library">跟书架一样</string>
+    <string name="grid_cover_height">封面高度</string>
+    <string name="grid_compact_hint">紧凑网格的标题压在封面上；标题长的话，用宽松网格或列表更好看。</string>
+    <string name="browse_list_style">列表样式</string>
+    <string name="browse_list_large">大行，标题在封面旁边</string>
+    <string name="browse_list_small">小行</string>
+    <string name="search_card_style">卡片样式</string>
+    <string name="search_card_wide">宽卡片，标题在封面旁边</string>
+    <string name="search_card_tall">竖卡片，标题在封面下面</string>
+    <string name="search_card_width">卡片宽度</string>
+    <string name="search_card_width_narrow">窄</string>
+    <string name="search_card_width_medium">中</string>
+    <string name="search_card_width_wide">宽</string>
 </resources>

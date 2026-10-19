@@ -15,8 +15,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import eu.kanade.presentation.browse.components.TitleLinesRow
 import eu.kanade.presentation.components.TabbedDialog
 import eu.kanade.presentation.components.TabbedDialogPaddings
+import eu.kanade.presentation.library.components.rememberGridPreferences
 import eu.kanade.tachiyomi.ui.library.LibrarySettingsViewModel
 import eu.kanade.tachiyomi.util.system.isReleaseBuildType
 import mihon.icons.materialsymbols.MaterialSymbols
@@ -262,6 +264,10 @@ private fun ColumnScope.DisplayPage(
             onChange = columnPreference::set,
             pillColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         )
+    }
+    // Fork: title lines below or over the covers
+    if (displayMode == LibraryDisplayMode.CompactGrid || displayMode == LibraryDisplayMode.ComfortableGrid) {
+        TitleLinesRow(rememberGridPreferences().libraryTitleLines)
     }
 
     HeadingItem(MR.strings.overlay_header)

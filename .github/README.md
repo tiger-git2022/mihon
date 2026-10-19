@@ -22,6 +22,8 @@
 - **章节大小**：漫画详情页的章节行显示已下载章节在本机的大小（书源不提供未下载章节的大小）。
 - **液态玻璃**：设置 → 外观 → 主题中的开关默认关闭。开启后，书架、浏览、书源和全局搜索顶部栏、搜索历史、同步进度、手机底部导航及平板侧栏使用玻璃效果；关闭时保留原界面。见 [接入说明](../docs/glass-components.md)。
 - **网站页面预览**：绅士漫画和 HentaiHand 有网站逐页小图时，漫画详情的章节下方显示前 20 页预览网格（可选 2–6 列），点图跳到那一页，「查看全部」打开分页网格；其他书源没有独立小图时不显示，不下载原图伪装缩略图。见 [支持范围](../docs/website-page-previews.md)。
+- **封面和标题**：书架的显示设置里可选标题行数（2、3、4、6 行或完整标题，默认完整）。浏览书源时，显示方式菜单里的「封面和标题」可设每行几本（默认跟书架一样）、封面高度（矮的封面会裁掉上下）、标题行数和列表样式（默认是像 EhViewer 那样的大行，标题在封面旁边）。全局搜索右上角新加的网格按钮打开同样的设置，可选宽卡片（默认，标题在封面旁边）或竖卡片，以及卡片宽度和竖卡片的标题行数。改动在下方页面上立刻生效。
+- **顶栏**：同步进度紧贴搜索栏下方；「热门/最近更新/筛选」和「已置顶/全部/有结果」放在它下面，往下滑时收起，往上滑就回来。全局搜索同步时只显示同步进度条，搜索进度看各书源那一行的转圈。
 - **全局搜索记录**：双栏显示，长关键词自动换行。有搜索词时点击搜索栏也能打开历史，收起后保留原结果和滚动位置。
 - **全局搜索换写法重试**：某个书源搜不到结果时，按 EhViewer 收藏清单里同一本书的罗马音标题和日文标题，自动换成另一种写法再搜一次（作者、社团或标题，比如「チビゴン」↔「Chibigon」；清单里没有的纯假名名字按规则转成罗马音，汉字名字做不到），书源名旁注明「用「Chibigon」搜到」，点进书源也用这个写法。
 - **“看过”标记**：漫画详情页的“标记看过”按钮，和书架互不影响（移出书架后仍保留）。浏览书源和全局搜索结果的封面上用眼睛角标显示。E-Hentai 系画廊按画廊 ID 匹配，E-Hentai 和 ExHentai 通用。
@@ -131,6 +133,8 @@ Personal fork of [mihonapp/mihon](https://github.com/mihonapp/mihon). The `custo
 - **Chapter sizes**: chapters downloaded on this device show their size in the chapter list of a manga (sources give none for chapters not downloaded).
 - **Liquid glass**: an off-by-default Appearance switch enables glass on the selected library, browsing and search toolbars, history, sync progress and phone/tablet navigation. See the [integration notes](../docs/glass-components.md).
 - **Website page previews**: WNACG server thumbnails are shown in a paginated grid from the manga menu, with tap-to-read navigation. Sources without an established thumbnail interface are skipped; original images are never fetched to manufacture previews. See [support notes](../docs/website-page-previews.md).
+- **Covers and titles**: title lines for the library in its display settings (2, 3, 4, 6 or whole, whole by default). When browsing a source, "Covers and titles" in the display mode menu sets covers per row (as in the library by default), cover height (shorter covers are cropped), title lines and the list style (large rows with the title beside the cover, like EhViewer, by default). A grid button at the top of global search opens the same settings for wide cards (default) or tall cards, the card width and the title lines of tall cards. Changes show at once on the page below.
+- **Top bars**: sync progress sits right below the search field, the Popular/Latest/Filter and Pinned/All/Has results chips below it, sliding away while the page scrolls down and back as it scrolls up. While a sync runs, global search shows only the sync bar; each source row still spins until it is searched.
 - **Global search history** in two columns; long queries wrap. Focusing a nonempty search also opens history, while preserving the results and scroll position underneath.
 - **Global search tries the other spelling**: a source that finds nothing is searched again with the other spelling of the artist, circle or title, learned from the default and Japanese titles in the EhViewer favorites ("チビゴン" ↔ "Chibigon"), else the romanized kana of the name. The source shows "Found as …", and opening it keeps that spelling.
 - **"Read before" mark**: a button on the manga details page, independent of the library (kept after removing from the library). Shown as an eye badge on covers in Browse and global search. E-Hentai galleries match by gallery ID, so E-Hentai and ExHentai share marks.

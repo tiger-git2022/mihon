@@ -26,7 +26,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import eu.kanade.presentation.components.CollapsingHeaderState
 import eu.kanade.presentation.components.SearchToolbar
+import eu.kanade.presentation.components.collapsingHeader
 import eu.kanade.presentation.library.components.LibrarySyncProgressBar
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.SourceFilter
 import eu.kanade.tachiyomi.ui.library.rememberLibrarySyncAction
@@ -57,7 +59,13 @@ fun GlobalSearchToolbar(
     // Fork: actions right of the search field
     actions: @Composable RowScope.() -> Unit = {},
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    // Fork: the chips slide away while the results scroll down
+    chipsState: CollapsingHeaderState? = null,
 ) {
+    // Fork: one bar at a time; while the library syncs its progress takes the place of the search's, which each
+    // source's row still shows with its spinner
+    val sync = rememberLibrarySyncAction()
+    val syncing = sync.progressLine != null && sync.progress != null
     Column(modifier = Modifier.background(glassContainerColor(MaterialTheme.colorScheme.surface))) {
         Box {
             SearchToolbar(
@@ -70,7 +78,7 @@ fun GlobalSearchToolbar(
                 actions = actions,
                 scrollBehavior = scrollBehavior,
             )
-            if (progress in 1..<total) {
+            if (progress in 1..<total && !syncing) {
                 LinearProgressIndicator(
                     progress = { progress / total.toFloat() },
                     modifier = Modifier
@@ -79,9 +87,11 @@ fun GlobalSearchToolbar(
                 )
             }
         }
+        LibrarySyncProgressBar(sync) // Fork: live sync progress right below the search field
 
         Row(
             modifier = Modifier
+                .collapsingHeader(chipsState)
                 .horizontalScroll(rememberScrollState())
                 .padding(horizontal = MaterialTheme.padding.small),
             horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
@@ -142,6 +152,5 @@ fun GlobalSearchToolbar(
 
         // Fork: with glass, no line between the chips and the history or results below.
         if (LocalGlassBackdrop.current == null) HorizontalDivider()
-        LibrarySyncProgressBar(rememberLibrarySyncAction()) // Fork: live sync progress
     }
 }
