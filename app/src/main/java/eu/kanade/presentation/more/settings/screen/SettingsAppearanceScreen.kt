@@ -41,6 +41,7 @@ object SettingsAppearanceScreen : SearchableSettings {
 
         return listOf(
             getThemeGroup(uiPreferences = uiPreferences),
+            getGlassTuningGroup(), // Fork: glass blur and opacity
             getDisplayGroup(uiPreferences = uiPreferences),
         )
     }

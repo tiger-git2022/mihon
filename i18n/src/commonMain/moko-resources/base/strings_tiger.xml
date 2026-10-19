@@ -120,4 +120,15 @@
     <string name="search_card_width_narrow">Narrow</string>
     <string name="search_card_width_medium">Medium</string>
     <string name="search_card_width_wide">Wide</string>
+
+    <!-- Glass tuning -->
+    <string name="pref_glass_tuning">Glass blur and opacity</string>
+    <string name="pref_glass_bar_blur">Bars: blur</string>
+    <string name="pref_glass_bar_opacity">Bars: opacity</string>
+    <string name="pref_glass_opacity_summary">Top bars, the navigation bar and the sync progress. Lower is clearer, higher is more solid.</string>
+    <string name="pref_glass_overlay_blur">Full-screen glass: blur</string>
+    <string name="pref_glass_overlay_summary">Glass over the whole page, like the search history.</string>
+    <string name="pref_glass_overlay_opacity">Full-screen glass: opacity</string>
+    <string name="pref_glass_blur_value">%d dp</string>
+    <string name="pref_glass_reset">Reset blur and opacity</string>
 </resources>

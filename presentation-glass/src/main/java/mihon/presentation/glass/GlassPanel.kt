@@ -68,11 +68,18 @@ fun Modifier.glassPanel(
 ): Modifier {
     if (backdrop == null || !LocalLiquidGlassEnabled.current) return this
     val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    // Fork: the bars and the whole-screen glass take their blur and tint from the settings
+    val tuning = LocalGlassTuning.current
+    val tintAlpha = when (style) {
+        GlassStyle.Panel -> tuning.panelTint
+        GlassStyle.Backdrop -> tuning.backdropTint
+        else -> style.tintAlpha
+    }
     // Light themes tint white: tinted with the gray surface colors, the glass was darker than the page.
     val tint = if (dark) {
-        MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = style.tintAlpha)
+        MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = tintAlpha)
     } else {
-        Color.White.copy(alpha = style.tintAlpha)
+        Color.White.copy(alpha = tintAlpha)
     }
     val edge = when {
         !dark || style == GlassStyle.Backdrop -> null
@@ -96,14 +103,16 @@ fun Modifier.glassPanel(
                     lens(12f.dp.toPx(), 20f.dp.toPx(), chromaticAberration = true)
                 }
                 GlassStyle.Panel -> {
-                    blur(4f.dp.toPx())
+                    if (tuning.panelBlur > 0f) blur(tuning.panelBlur.dp.toPx())
                     lens(16f.dp.toPx(), 28f.dp.toPx(), chromaticAberration = true)
                 }
                 GlassStyle.Sheet -> {
                     blur(2.5f.dp.toPx())
                     lens(25f.dp.toPx(), 10f.dp.toPx())
                 }
-                GlassStyle.Backdrop -> blur(10f.dp.toPx())
+                GlassStyle.Backdrop -> {
+                    if (tuning.backdropBlur > 0f) blur(tuning.backdropBlur.dp.toPx())
+                }
             }
         },
         highlight = edge?.let { { it } },

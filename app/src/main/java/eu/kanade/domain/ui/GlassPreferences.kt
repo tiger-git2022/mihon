@@ -14,6 +14,12 @@ import tachiyomi.core.common.preference.PreferenceStore
 class GlassPreferences(preferenceStore: PreferenceStore) {
     val liquidGlass = preferenceStore.getBoolean("tiger_liquid_glass", false)
 
+    // Blur in dp and opacity in percent of the glass, see GlassTuning; the defaults are EhViewer's numbers.
+    val glassBarBlur = preferenceStore.getInt("tiger_glass_bar_blur", 4)
+    val glassBarOpacity = preferenceStore.getInt("tiger_glass_bar_opacity", 20)
+    val glassOverlayBlur = preferenceStore.getInt("tiger_glass_overlay_blur", 10)
+    val glassOverlayOpacity = preferenceStore.getInt("tiger_glass_overlay_opacity", 40)
+
     /** Columns of the website page previews, on the details and in the full grid. */
     val websitePreviewColumns = preferenceStore.getInt("tiger_website_preview_columns", 4)
 
