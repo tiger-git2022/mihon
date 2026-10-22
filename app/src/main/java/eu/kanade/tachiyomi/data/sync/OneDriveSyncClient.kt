@@ -132,9 +132,10 @@ class OneDriveSyncClient(
 
     /**
      * Writes [contents] to [fileName]. With [etag] the write only succeeds if the file did not
-     * change since it was read; without it, only if the file does not exist yet.
+     * change since it was read; without it, only if the file does not exist yet. Returns the eTag
+     * of the written file, as [topLevelETags] lists it (null if OneDrive did not give it).
      */
-    suspend fun writeDocument(fileName: String = LIBRARY_FILE, contents: String, etag: String?) {
+    suspend fun writeDocument(fileName: String = LIBRARY_FILE, contents: String, etag: String?): String? {
         val accessToken = acquireAccessToken()
         val request = Request.Builder()
             .url(fileUrl(fileName))
@@ -149,14 +150,49 @@ class OneDriveSyncClient(
             .put(contents.toRequestBody(JSON_MEDIA_TYPE))
             .build()
 
-        httpClient.newCall(request).await().use { response ->
+        return httpClient.newCall(request).await().use { response ->
             when {
                 response.code == 412 -> throw OneDriveSyncConflictException(
                     "The OneDrive sync file changed on another device. Sync again to merge the latest copy.",
                 )
                 !response.isSuccessful -> throw response.toGraphException("upload", fileName)
             }
+            // The upload answers with the drive item of the file
+            runCatching { JSONObject(response.body.string()).optString("eTag") }.getOrNull()?.takeIf(String::isNotBlank)
         }
+    }
+
+    /**
+     * eTags of the files at the top of the app folder, by name, in one request (one per 200 files): a sync compares
+     * them with those of its copies ([SyncFileCache]) to find the files that changed.
+     */
+    suspend fun topLevelETags(): Map<String, String> {
+        val accessToken = acquireAccessToken()
+        val eTags = mutableMapOf<String, String>()
+        var url: String? = "$APP_FOLDER_URL/children?\$select=name,eTag,file&\$top=200"
+        while (url != null) {
+            val request = Request.Builder()
+                .url(url)
+                .header("Authorization", "Bearer $accessToken")
+                .get()
+                .build()
+            url = httpClient.newCall(request).await().use { response ->
+                // No app folder yet: no files
+                if (response.code == 404) return eTags
+                if (!response.isSuccessful) throw response.toGraphException("list", "app folder")
+                val json = JSONObject(response.body.string())
+                val items = json.optJSONArray("value")
+                for (index in 0..<(items?.length() ?: 0)) {
+                    val item = items!!.getJSONObject(index)
+                    if (!item.has("file")) continue
+                    val name = item.optString("name").takeIf(String::isNotBlank) ?: continue
+                    val eTag = item.optString("eTag").takeIf(String::isNotBlank) ?: continue
+                    eTags[name] = eTag
+                }
+                json.optString("@odata.nextLink").takeIf(String::isNotBlank)
+            }
+        }
+        return eTags
     }
 
     /** The bytes of [fileName], null if there is none; [onProgress] gets the bytes read and the size (-1 if unknown). */

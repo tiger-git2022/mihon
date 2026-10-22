@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.data.sync
 
 import android.app.Activity
+import android.content.Context
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -26,6 +27,7 @@ import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.manga.model.MangaUpdate
 import tachiyomi.domain.manga.repository.MangaRepository
+import java.io.File
 import java.io.IOException
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -33,6 +35,7 @@ import kotlin.time.Instant
 @Inject
 @SingleIn(AppScope::class)
 class LibrarySyncService(
+    context: Context,
     private val json: Json,
     private val preferences: LibrarySyncPreferences,
     private val mangaRepository: MangaRepository,
@@ -43,6 +46,12 @@ class LibrarySyncService(
     private val settingsBackupSync: SettingsBackupSync,
 ) {
     private val syncMutex = Mutex()
+
+    // Fork: the files as last synced, so unchanged ones are neither downloaded nor uploaded
+    private val cacheDir = File(context.filesDir, "tiger/sync-cache")
+    private val libraryCache = SyncFileCache(cacheDir, OneDriveSyncClient.LIBRARY_FILE)
+    private val searchHistoryCache = SyncFileCache(cacheDir, SearchHistorySyncFile.FILE_NAME)
+    private val marksCache = SyncFileCache(cacheDir, MangaMarksFile.FILE_NAME)
 
     // Fork: manual syncs run here, not in the screen that started them, see syncManually
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -161,10 +170,15 @@ class LibrarySyncService(
         updateAccount(account)
         val device = preferences.currentDevice()
 
-        val result = retryOnConflict { syncLibrary() }
+        // One request tells which files changed on OneDrive since this device last synced them
+        phase(LibrarySyncProgress.Phase.DOWNLOAD)
+        val eTags = oneDriveSyncClient.topLevelETags()
+        val result = retryOnConflict { syncLibrary(eTags[OneDriveSyncClient.LIBRARY_FILE]) }
         val warnings = listOfNotNull(
-            runStep(LibrarySyncProgress.Step.SEARCH_HISTORY) { retryOnConflict { syncSearchHistory(device) } },
-            runStep(LibrarySyncProgress.Step.MARKS) { retryOnConflict { syncMarks() } },
+            runStep(LibrarySyncProgress.Step.SEARCH_HISTORY) {
+                retryOnConflict { syncSearchHistory(device, eTags[SearchHistorySyncFile.FILE_NAME]) }
+            },
+            runStep(LibrarySyncProgress.Step.MARKS) { retryOnConflict { syncMarks(eTags[MangaMarksFile.FILE_NAME]) } },
             if (manual) {
                 runStep(LibrarySyncProgress.Step.SETTINGS_BACKUP) {
                     settingsBackupSync.upload(device) { stage ->
@@ -215,10 +229,10 @@ class LibrarySyncService(
         mangaMarkStore.setRead(manga.source, manga.url, manga.title, read, preferences.currentDevice())
     }
 
-    private suspend fun syncSearchHistory(device: SyncDevice) {
+    private suspend fun syncSearchHistory(device: SyncDevice, cloudETag: String?) {
         val now = Clock.System.now().toEpochMilliseconds()
         phase(LibrarySyncProgress.Phase.DOWNLOAD)
-        val remoteDocument = oneDriveSyncClient.readDocument(SearchHistorySyncFile.FILE_NAME)
+        val remoteDocument = readCloud(searchHistoryCache, cloudETag)
         val cloud = remoteDocument.contents?.takeIf(String::isNotBlank)
             ?.let { json.decodeFromString<SearchHistorySyncFile>(it) }
             ?: SearchHistorySyncFile()
@@ -232,21 +246,26 @@ class LibrarySyncService(
         val clearedAt = maxOf(searchHistoryPreferences.clearedAt.get(), cloud.clearedAt)
         val merged = SearchHistoryMerger.merge(local, cloud.entries, now, clearedAt)
         phase(LibrarySyncProgress.Phase.UPLOAD)
-        oneDriveSyncClient.writeDocument(
-            fileName = SearchHistorySyncFile.FILE_NAME,
-            contents = json.encodeToString(SearchHistorySyncFile(entries = merged, clearedAt = clearedAt)),
-            etag = remoteDocument.etag,
-        )
+        val unchanged = remoteDocument.contents != null &&
+            clearedAt == cloud.clearedAt &&
+            merged.toSet() == cloud.entries.toSet()
+        val upload = if (unchanged) {
+            null
+        } else {
+            val contents = json.encodeToString(SearchHistorySyncFile(entries = merged, clearedAt = clearedAt))
+            contents to write(searchHistoryCache, contents, remoteDocument)
+        }
         // Keeps searches (or a clear) made while syncing; they go up with the next sync
         searchHistoryPreferences.update { entries, localClearedAt ->
             val newClearedAt = maxOf(localClearedAt, clearedAt)
             SearchHistoryState(SearchHistoryMerger.merge(entries, merged, now, newClearedAt), newClearedAt)
         }
+        keepCopy(searchHistoryCache, remoteDocument, upload)
     }
 
-    private suspend fun syncMarks() {
+    private suspend fun syncMarks(cloudETag: String?) {
         phase(LibrarySyncProgress.Phase.DOWNLOAD)
-        val remoteDocument = oneDriveSyncClient.readDocument(MangaMarksFile.FILE_NAME)
+        val remoteDocument = readCloud(marksCache, cloudETag)
         val cloud = remoteDocument.contents?.takeIf(String::isNotBlank)
             ?.let { json.decodeFromString<MangaMarksFile>(it) }
             ?: MangaMarksFile()
@@ -255,13 +274,56 @@ class LibrarySyncService(
         }
         val merged = MangaMarksMerger.merge(mangaMarkStore.get(), cloud)
         phase(LibrarySyncProgress.Phase.UPLOAD)
-        oneDriveSyncClient.writeDocument(
-            fileName = MangaMarksFile.FILE_NAME,
-            contents = json.encodeToString(merged),
-            etag = remoteDocument.etag,
-        )
+        val unchanged = remoteDocument.contents != null && merged.readMarks.toSet() == cloud.readMarks.toSet()
+        val upload = if (unchanged) {
+            null
+        } else {
+            val contents = json.encodeToString(merged)
+            contents to write(marksCache, contents, remoteDocument)
+        }
         mangaMarkStore.update { MangaMarksMerger.merge(it, merged) }
+        keepCopy(marksCache, remoteDocument, upload)
     }
+
+    /**
+     * The file on OneDrive: the copy in [cache] while the file still has [cloudETag] (its eTag in this sync's listing),
+     * otherwise downloaded.
+     */
+    private suspend fun readCloud(cache: SyncFileCache, cloudETag: String?): CloudCopy {
+        val copy = cache.contentsIfCurrent(cloudETag)
+        if (copy != null) return CloudCopy(copy, writeETag = cloudETag, listedETag = cloudETag, downloaded = false)
+        val document = oneDriveSyncClient.readDocument(cache.fileName)
+        return CloudCopy(document.contents, writeETag = document.etag, listedETag = cloudETag, downloaded = true)
+    }
+
+    /** Uploads [contents] over [cloud], returning the eTag of the new file. */
+    private suspend fun write(cache: SyncFileCache, contents: String, cloud: CloudCopy): String? = try {
+        oneDriveSyncClient.writeDocument(fileName = cache.fileName, contents = contents, etag = cloud.writeETag)
+    } catch (e: OneDriveSyncConflictException) {
+        // The retry downloads the file, whatever the listing said
+        cache.forgetETag()
+        throw e
+    }
+
+    /**
+     * Keeps the file as now on OneDrive as the copy in [cache], once the step has applied it: [upload] (the contents
+     * and their eTag) if the step uploaded, otherwise the file it read.
+     */
+    private fun keepCopy(cache: SyncFileCache, cloud: CloudCopy, upload: Pair<String, String?>?) {
+        when {
+            upload != null -> cache.save(upload.first, upload.second)
+            cloud.downloaded && cloud.contents != null -> cache.save(cloud.contents, cloud.listedETag)
+        }
+    }
+
+    private class CloudCopy(
+        val contents: String?,
+        /** For If-Match on upload: the eTag of the download, or that of the listing for the copy. */
+        val writeETag: String?,
+        /** The eTag of the file in this sync's listing. */
+        val listedETag: String?,
+        val downloaded: Boolean,
+    )
 
     /** Runs a secondary sync step; returns its error message instead of failing the whole sync. */
     private suspend fun runStep(progressStep: LibrarySyncProgress.Step, step: suspend () -> Unit): String? {
@@ -283,22 +345,29 @@ class LibrarySyncService(
         progressThrottle.update(LibrarySyncProgress(step, done, total, phase = phase))
     }
 
-    private suspend fun syncLibrary(): LibrarySyncResult {
+    private suspend fun syncLibrary(cloudETag: String?): LibrarySyncResult {
         val now = Clock.System.now().toEpochMilliseconds()
         phase(LibrarySyncProgress.Phase.DOWNLOAD)
-        val remoteDocument = oneDriveSyncClient.readDocument()
-        val cloud = readSyncFile(remoteDocument.contents)
+        // Read before the copy is replaced below
         val baseline = readBaseline()
-        val localState = collectLocalState(cloud, baseline, now)
-        val merged = LibrarySyncMerger.merge(localState.entries, cloud, baseline, now)
+        val remoteDocument = readCloud(libraryCache, cloudETag)
+        val cloud = readSyncFile(remoteDocument.contents)
+        val favorites = mangaRepository.getFavorites()
+        val favoriteByKey = favorites.associateBy { LibrarySyncKey(it.source, it.url) }
+        val local = collectLocalState(favoriteByKey, cloud, baseline, now)
+        val merged = LibrarySyncMerger.merge(local, cloud, baseline, now)
 
         phase(LibrarySyncProgress.Phase.UPLOAD)
-        oneDriveSyncClient.writeDocument(
-            contents = json.encodeToString(merged),
-            etag = remoteDocument.etag,
-        )
-        val result = applyMergedState(merged, localState.mangaByKey, now)
-        preferences.baseline.set(json.encodeToString(merged))
+        val upload = if (remoteDocument.contents != null && merged.entries == cloud.entries) {
+            null
+        } else {
+            val contents = json.encodeToString(merged)
+            contents to write(libraryCache, contents, remoteDocument)
+        }
+        val result = applyMergedState(merged, favoriteByKey, now)
+        // Only once applied: until then the next sync must still see the cloud changes as changes
+        keepCopy(libraryCache, remoteDocument, upload)
+        preferences.baseline.delete()
         // The state written to OneDrive, not read back: a change made meanwhile must still count as a change
         lastSyncedFavorites = merged.entries.filter(LibrarySyncEntry::favorite).mapTo(HashSet(), LibrarySyncEntry::key)
         return result.copy(total = merged.entries.count(LibrarySyncEntry::favorite))
@@ -309,6 +378,9 @@ class LibrarySyncService(
         val currentAccountId = account?.id.orEmpty()
         if (previousAccountId != currentAccountId) {
             preferences.baseline.delete()
+            libraryCache.clear()
+            searchHistoryCache.clear()
+            marksCache.clear()
             // The EhViewer favorites belong to the previous account; the next sync downloads those of the new one
             ehFavoritesStore.clear()
             // So is the result of the last sync shown by the sync action
@@ -336,63 +408,63 @@ class LibrarySyncService(
         return file
     }
 
+    /** The library as last synced: the copy of the file, or (before the first sync with the copy) the old preference. */
     private fun readBaseline(): LibrarySyncFile? {
-        return preferences.baseline.get()
+        return (libraryCache.contents() ?: preferences.baseline.get())
             .takeIf(String::isNotBlank)
             ?.let { contents -> runCatching { json.decodeFromString<LibrarySyncFile>(contents) }.getOrNull() }
     }
 
-    private suspend fun collectLocalState(
+    /**
+     * This device's library as sync entries: its favorites ([favoriteByKey], read in one query), and for the entries
+     * of the cloud or the baseline that are not favorites here, whether that is a change since the baseline. Those
+     * keep the details of the baseline, so no entry needs a query of its own.
+     */
+    private fun collectLocalState(
+        favoriteByKey: Map<LibrarySyncKey, Manga>,
         cloud: LibrarySyncFile,
         baseline: LibrarySyncFile?,
         now: Long,
-    ): LocalState {
-        val favorites = mangaRepository.getFavorites()
-        val favoriteByKey = favorites.associateBy { LibrarySyncKey(it.source, it.url) }
-        val cloudByKey = cloud.entries.associateBy(LibrarySyncEntry::key)
+    ): Map<LibrarySyncKey, LibrarySyncEntry> {
+        val cloudKeys = cloud.entries.mapTo(HashSet(), LibrarySyncEntry::key)
         val baselineByKey = baseline?.entries.orEmpty().associateBy(LibrarySyncEntry::key)
-        val keys = favoriteByKey.keys + cloudByKey.keys + baselineByKey.keys
+        val keys = favoriteByKey.keys + cloudKeys + baselineByKey.keys
         var compared = 0
         val entries = mutableMapOf<LibrarySyncKey, LibrarySyncEntry>()
-        val mangaByKey = mutableMapOf<LibrarySyncKey, Manga?>()
 
         for (key in keys) {
             phase(LibrarySyncProgress.Phase.COMPARE, compared++, keys.size)
-            val existing = favoriteByKey[key]
-                ?: mangaRepository.getMangaByUrlAndSourceId(key.mangaUrl, key.sourceId)
-            mangaByKey[key] = existing
+            val favorite = favoriteByKey[key]
             val baselineEntry = baselineByKey[key]
 
             if (baselineEntry == null) {
-                if (existing?.favorite == true) {
-                    entries[key] = existing.toSyncEntry(modifiedAt = existing.membershipModifiedAt(now))
+                if (favorite != null) {
+                    entries[key] = favorite.toSyncEntry(modifiedAt = favorite.membershipModifiedAt(now))
                 }
                 continue
             }
 
-            val currentFavorite = existing?.favorite == true
-            if (currentFavorite == baselineEntry.favorite) {
-                entries[key] = baselineEntry.copy(
-                    manga = existing?.let(LibrarySyncManga::from) ?: baselineEntry.manga,
-                )
+            val currentFavorite = favorite != null
+            val metadata = favorite?.let(LibrarySyncManga::from) ?: baselineEntry.manga
+            entries[key] = if (currentFavorite == baselineEntry.favorite) {
+                baselineEntry.copy(manga = metadata)
             } else {
-                val metadata = existing?.let(LibrarySyncManga::from)
-                    ?: baselineEntry.manga
-                entries[key] = LibrarySyncEntry(
+                LibrarySyncEntry(
                     sourceId = key.sourceId,
                     mangaUrl = key.mangaUrl,
                     favorite = currentFavorite,
-                    modifiedAt = existing?.membershipModifiedAt(now) ?: now,
+                    modifiedAt = favorite?.membershipModifiedAt(now) ?: now,
                     manga = metadata,
                 )
             }
         }
-        return LocalState(entries, mangaByKey)
+        return entries
     }
 
+    /** Applies [merged] to the library; only entries added here need a query, to find a manga already known. */
     private suspend fun applyMergedState(
         merged: LibrarySyncFile,
-        knownManga: Map<LibrarySyncKey, Manga?>,
+        favoriteByKey: Map<LibrarySyncKey, Manga>,
         now: Long,
     ): LibrarySyncResult {
         var added = 0
@@ -400,24 +472,32 @@ class LibrarySyncService(
 
         for ((index, entry) in merged.entries.withIndex()) {
             phase(LibrarySyncProgress.Phase.APPLY, index, merged.entries.size)
-            val existing = knownManga[entry.key]
-                ?: mangaRepository.getMangaByUrlAndSourceId(entry.mangaUrl, entry.sourceId)
+            val favorite = favoriteByKey[entry.key]
             when {
-                entry.favorite && existing == null -> {
-                    mangaRepository.insertNetworkManga(
-                        listOf(entry.manga.toManga(entry.sourceId, entry.mangaUrl, now)),
-                    )
-                    added++
+                entry.favorite && favorite == null -> {
+                    val existing = mangaRepository.getMangaByUrlAndSourceId(entry.mangaUrl, entry.sourceId)
+                    when {
+                        existing == null -> {
+                            mangaRepository.insertNetworkManga(
+                                listOf(entry.manga.toManga(entry.sourceId, entry.mangaUrl, now)),
+                            )
+                            added++
+                        }
+                        // Added here while syncing
+                        existing.favorite -> Unit
+                        else -> {
+                            val success = mangaRepository.update(
+                                MangaUpdate(existing.id) { favoriteAt = Instant.fromEpochMilliseconds(now) },
+                            )
+                            if (!success) {
+                                throw LibrarySyncException("Could not add ${entry.manga.title} to the library")
+                            }
+                            added++
+                        }
+                    }
                 }
-                entry.favorite && existing != null && !existing.favorite -> {
-                    val success = mangaRepository.update(
-                        MangaUpdate(existing.id) { favoriteAt = Instant.fromEpochMilliseconds(now) },
-                    )
-                    if (!success) throw LibrarySyncException("Could not add ${entry.manga.title} to the library")
-                    added++
-                }
-                !entry.favorite && existing?.favorite == true -> {
-                    val success = mangaRepository.update(MangaUpdate(existing.id) { favoriteAt = null })
+                !entry.favorite && favorite != null -> {
+                    val success = mangaRepository.update(MangaUpdate(favorite.id) { favoriteAt = null })
                     if (!success) throw LibrarySyncException("Could not remove ${entry.manga.title} from the library")
                     removed++
                 }
@@ -441,11 +521,6 @@ class LibrarySyncService(
     private fun Manga.membershipModifiedAt(now: Long): Long {
         return favoriteAt?.toEpochMilliseconds()?.takeIf { it > 0 } ?: now
     }
-
-    private data class LocalState(
-        val entries: Map<LibrarySyncKey, LibrarySyncEntry>,
-        val mangaByKey: Map<LibrarySyncKey, Manga?>,
-    )
 }
 
 data class LibrarySyncProgress(
