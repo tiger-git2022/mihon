@@ -23,13 +23,6 @@ class MangaRestorer(
     private val now = Clock.System.now().toLocalDateTime(timeZone)
     private val currentFetchWindow = fetchInterval.getWindow(now.date, timeZone)
 
-    suspend fun sortByNew(backupMangas: List<BackupManga>): List<BackupManga> {
-        val urlsBySource = restoreRepository.getMangaUrlsBySourceId()
-
-        return backupMangas
-            .sortedBy { it.url in urlsBySource[it.source].orEmpty() }
-    }
-
     /**
      * Restores [backupMangas] all together, so either every one of them is restored or none is.
      */
