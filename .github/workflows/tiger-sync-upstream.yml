@@ -1,8 +1,9 @@
 # Fork (tiger-git2022/mihon): follow upstream releases.
 #
 # Every 6 hours, merge the latest mihonapp/mihon release tag into `custom`. If the merge is clean and
-# the app builds and passes unit tests, push it and publish a new release. Otherwise push nothing
-# and open an issue with the conflicting files or the build log.
+# the app builds and passes unit tests, push it and publish a new release. Otherwise push nothing,
+# put the conflicting files or the build log in the run summary (and an issue, if issues are on),
+# and fail the run so GitHub sends a notification.
 #
 # Scheduled workflows only run from the default branch, so `custom` must be the default branch.
 name: Tiger Sync Upstream
@@ -71,7 +72,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git merge --no-ff --no-commit "$TAG"
+          # A conflicted merge exits non-zero; the conflict check below handles it.
+          git merge --no-ff --no-commit "$TAG" || true
 
           # Upstream's workflows never land in this fork: they need upstream-only secrets, and
           # pushing workflow changes needs a token with the "workflows" permission.
@@ -183,15 +185,27 @@ jobs:
             echo "git rm -r -q -f --cached --ignore-unmatch -- .github/workflows && rm -rf .github/workflows && git checkout HEAD -- .github/workflows"
             echo '```'
           } > "$body"
+          cat "$body" >> "$GITHUB_STEP_SUMMARY"
 
+          # Issues may be turned off for this repository; the run summary and the failed run's
+          # notification are enough then.
           title="Upstream sync failed: $TAG"
-          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" \
-            --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
-          if [ -n "$existing" ]; then
-            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file "$body"
-          else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$body"
+          if [ "$(gh api "repos/$GITHUB_REPOSITORY" --jq .has_issues)" = "true" ]; then
+            existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" \
+              --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
+            if [ -n "$existing" ]; then
+              gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+            else
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$body"
+            fi
           fi
+
+          if [ "$MERGE_RESULT" = "conflict" ]; then
+            echo "::error title=合并上游 $TAG 有冲突 / Upstream merge conflicts::$(paste -sd ' ' "$RUNNER_TEMP/conflicts.txt")"
+          else
+            echo "::error title=同步上游 $TAG 失败 / Upstream sync failed::见运行摘要 / See the run summary"
+          fi
+          exit 1
 
   release:
     name: Release
