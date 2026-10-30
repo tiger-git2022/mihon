@@ -471,7 +471,8 @@ android {
 }
 
 // CI passes -Ptiger.buildNumber=N (see .github/workflows/tiger-release.yml). The release build then
-// gets versionName "<upstream versionName>-tN" and versionCode "<upstream versionCode> * 1000 + N".
+// gets versionName "<upstream versionName>-tNNN" (three digits, so the releases page lists releases
+// of the same day in order) and versionCode "<upstream versionCode> * 1000 + N".
 val tigerBuildNumber = providers.gradleProperty("tiger.buildNumber").orNull?.toInt()
 if (tigerBuildNumber != null) {
     require(tigerBuildNumber in 1..999) { "tiger.buildNumber must be between 1 and 999" }
@@ -480,7 +481,7 @@ if (tigerBuildNumber != null) {
             variant.outputs.forEach { output ->
                 val upstreamVersionName = output.versionName.get()
                 val upstreamVersionCode = output.versionCode.get() ?: 0
-                output.versionName.set("$upstreamVersionName-t$tigerBuildNumber")
+                output.versionName.set("$upstreamVersionName-t${"%03d".format(tigerBuildNumber)}")
                 output.versionCode.set(upstreamVersionCode * 1000 + tigerBuildNumber)
             }
         }

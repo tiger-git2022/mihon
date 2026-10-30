@@ -46,10 +46,10 @@ release 包的包名是 `app.mihon.tiger`，应用名 “Mihon Tiger”，可以
 
 | | 规则 | 例子 |
 |---|---|---|
-| tag / versionName | `v<上游 versionName>-t<N>` | `v0.21.2-t3` |
+| tag / versionName | `v<上游 versionName>-t<N>`，N 补足三位 | `v0.21.2-t003` |
 | versionCode | `<上游 versionCode> × 1000 + N` | `38003` |
 
-N 对每个上游版本从 1 开始，每次发布加 1，所以 versionCode 一定递增。
+N 对每个上游版本从 1 开始，每次发布加 1，所以 versionCode 一定递增。N 补足三位，是因为 GitHub 同一天的发布按标签逐字排序，不补的话 t9 会排在 t12 上面；之前的旧标签（如 `v0.21.2-t36`）没补，程序两种都认。
 `app/build.gradle.kts` 里上游的 `versionCode`/`versionName` 两行不要改，构建号由 CI 通过 `-Ptiger.buildNumber=N` 传入。
 应用内的版本比较见 `domain/src/main/java/tachiyomi/domain/release/interactor/ForkVersion.kt`。
 
@@ -150,7 +150,7 @@ Personal fork of [mihonapp/mihon](https://github.com/mihonapp/mihon). The `custo
 
 ### Versions
 
-Tag / versionName `v<upstream versionName>-t<N>` (for example `v0.21.2-t3`); versionCode `<upstream versionCode> × 1000 + N`. N starts at 1 for each upstream version and increases with every release.
+Tag / versionName `v<upstream versionName>-t<N>` with N padded to three digits (for example `v0.21.2-t003`, so the releases page lists releases of the same day in order; older tags such as `v0.21.2-t36` are unpadded); versionCode `<upstream versionCode> × 1000 + N`. N starts at 1 for each upstream version and increases with every release.
 
 ### GitHub Actions
 
