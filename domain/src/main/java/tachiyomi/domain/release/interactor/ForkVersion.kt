@@ -3,7 +3,8 @@ package tachiyomi.domain.release.interactor
 /**
  * Version of a tiger-git2022/mihon release (fork-only).
  *
- * Fork releases are tagged `v<upstream version>-t<build number>`, e.g. `v0.21.2-t5`. A version
+ * Fork releases are tagged `v<upstream version>-t<build number>`, e.g. `v0.21.2-t005` (older
+ * ones `v0.21.2-t5`). A version
  * without the `-t` suffix (an upstream version, or a local build) has build number 0, so it is
  * older than any fork build of the same upstream version.
  */

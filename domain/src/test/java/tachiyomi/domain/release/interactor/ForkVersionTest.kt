@@ -20,6 +20,14 @@ class ForkVersionTest {
     }
 
     @Test
+    fun `three-digit build numbers compare with the older unpadded ones`() {
+        ForkVersion.parse("v0.21.3-t002") shouldBe ForkVersion(listOf(0, 21, 3), 2)
+        ForkVersion.isNewer(versionName = "0.21.2-t36", versionTag = "v0.21.2-t037") shouldBe true
+        ForkVersion.isNewer(versionName = "0.21.3-t9", versionTag = "v0.21.3-t010") shouldBe true
+        ForkVersion.isNewer(versionName = "0.21.3-t002", versionTag = "v0.21.3-t2") shouldBe false
+    }
+
+    @Test
     fun `newer upstream version is an update regardless of build number`() {
         ForkVersion.isNewer(versionName = "0.21.1-t12", versionTag = "v0.21.2-t1") shouldBe true
         ForkVersion.isNewer(versionName = "0.21.9-t3", versionTag = "v0.22.0-t1") shouldBe true

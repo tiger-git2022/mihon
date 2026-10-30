@@ -1,8 +1,10 @@
 # Fork (tiger-git2022/mihon): build signed release APKs and publish them as a GitHub Release.
 #
-# Version scheme: tag/versionName "v<upstream versionName>-t<N>", versionCode
+# Version scheme: tag/versionName "v<upstream versionName>-t<NNN>", versionCode
 # "<upstream versionCode> * 1000 + N". N starts at 1 for every upstream version and increases with
-# each release of it, so versionCode always increases. The in-app updater compares versions the
+# each release of it, so versionCode always increases. N has three digits because GitHub orders
+# releases of the same day by their tag's pre-release part as text, which put "t9" above "t12";
+# older tags have no padding. The in-app updater compares versions the
 # same way (domain/.../release/interactor/ForkVersion.kt).
 name: Tiger Release
 
@@ -76,8 +78,9 @@ jobs:
           fi
 
           last=$(git tag --list "v${upstream_name}-t*" | sed -E "s/^v.*-t//" | grep -E '^[0-9]+$' | sort -n | tail -n 1 || true)
-          build=$(( ${last:-0} + 1 ))
-          version_name="${upstream_name}-t${build}"
+          # 10# reads "012" as twelve, not as an octal number
+          build=$(( 10#${last:-0} + 1 ))
+          version_name=$(printf '%s-t%03d' "$upstream_name" "$build")
           version_code=$(( upstream_code * 1000 + build ))
           previous=$(git describe --tags --abbrev=0 --match 'v*-t*' HEAD 2>/dev/null || true)
 
