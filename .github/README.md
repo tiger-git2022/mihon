@@ -46,11 +46,11 @@ release 包的包名是 `app.mihon.tiger`，应用名 “Mihon Tiger”，可以
 
 | | 规则 | 例子 |
 |---|---|---|
-| tag / versionName | `v<上游 versionName>-t<N>`，N 补足三位 | `v0.21.2-t003` |
-| versionCode | `<上游 versionCode> × 1000 + N` | `38003` |
+| tag / versionName | `vX.Y.Z`，这个改版自己的版本号 | `v2.4.0` |
+| versionCode | `X × 10000000 + Y × 10000 + Z` | `20040000` |
 
-N 对每个上游版本从 1 开始，每次发布加 1，所以 versionCode 一定递增。N 补足三位，是因为 GitHub 同一天的发布按标签逐字排序，不补的话 t9 会排在 t12 上面；之前的旧标签（如 `v0.21.2-t36`）没补，程序两种都认。
-`app/build.gradle.kts` 里上游的 `versionCode`/`versionName` 两行不要改，构建号由 CI 通过 `-Ptiger.buildNumber=N` 传入。
+`.github/fork-version` 记 X.Y：加新功能或合入上游新版本涨 Y，大改涨 X；Z 每次发布自动加一，修 bug 不用改。基于的上游 Mihon 版本写在每个版本的说明和「关于」页里。2026-11 以前的旧版本是 `v0.21.2-t003` 这种写法（versionCode `<上游 versionCode> × 1000 + N`），都比新版本旧。
+`app/build.gradle.kts` 里上游的 `versionCode`/`versionName` 两行不要改，版本号由 CI 通过 `-Ptiger.version=X.Y.Z` 传入。
 应用内的版本比较见 `domain/src/main/java/tachiyomi/domain/release/interactor/ForkVersion.kt`。
 
 ### GitHub Actions
@@ -150,7 +150,7 @@ Personal fork of [mihonapp/mihon](https://github.com/mihonapp/mihon). The `custo
 
 ### Versions
 
-Tag / versionName `v<upstream versionName>-t<N>` with N padded to three digits (for example `v0.21.2-t003`, so the releases page lists releases of the same day in order; older tags such as `v0.21.2-t36` are unpadded); versionCode `<upstream versionCode> × 1000 + N`. N starts at 1 for each upstream version and increases with every release.
+Tag / versionName `vX.Y.Z`, the fork's own version (for example `v2.4.0`); versionCode `X × 10000000 + Y × 10000 + Z`. `.github/fork-version` holds X.Y: new features or an upstream update raise Y, big changes raise X, and Z grows by one with each release. The upstream Mihon version is in the release notes and on the About page. Releases before November 2026 were named like `v0.21.2-t003` (versionCode `<upstream versionCode> × 1000 + N`); all of them are older.
 
 ### GitHub Actions
 

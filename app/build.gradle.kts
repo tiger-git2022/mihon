@@ -470,19 +470,27 @@ android {
     }
 }
 
-// CI passes -Ptiger.buildNumber=N (see .github/workflows/tiger-release.yml). The release build then
-// gets versionName "<upstream versionName>-tNNN" (three digits, so the releases page lists releases
-// of the same day in order) and versionCode "<upstream versionCode> * 1000 + N".
-val tigerBuildNumber = providers.gradleProperty("tiger.buildNumber").orNull?.toInt()
-if (tigerBuildNumber != null) {
-    require(tigerBuildNumber in 1..999) { "tiger.buildNumber must be between 1 and 999" }
+// CI passes -Ptiger.version=X.Y.Z, the fork's own version (see .github/workflows/tiger-release.yml;
+// .github/fork-version holds X.Y). The release build then gets versionName "X.Y.Z" and versionCode
+// X * 10000000 + Y * 10000 + Z, above the earlier "<upstream>-tNNN" builds (upstream versionCode
+// * 1000 + N). The upstream version stays in BuildConfig.UPSTREAM_VERSION_NAME for the About page.
+val tigerVersion = providers.gradleProperty("tiger.version").orNull
+androidComponents {
+    onVariants { variant ->
+        // Read from defaultConfig: the variant's versionName is replaced below
+        val upstreamVersionName = android.defaultConfig.versionName
+        variant.buildConfigField("String", "UPSTREAM_VERSION_NAME", provider { "\"$upstreamVersionName\"" })
+    }
+}
+if (tigerVersion != null) {
+    val parts = Regex("""(\d{1,2})\.(\d{1,3})\.(\d{1,4})""").matchEntire(tigerVersion)?.groupValues?.drop(1)
+        ?.map(String::toInt)
+    require(parts != null) { "tiger.version must be X.Y.Z with X < 100, Y < 1000, Z < 10000" }
     androidComponents {
         onVariants(selector().withBuildType("release")) { variant ->
             variant.outputs.forEach { output ->
-                val upstreamVersionName = output.versionName.get()
-                val upstreamVersionCode = output.versionCode.get() ?: 0
-                output.versionName.set("$upstreamVersionName-t${"%03d".format(tigerBuildNumber)}")
-                output.versionCode.set(upstreamVersionCode * 1000 + tigerBuildNumber)
+                output.versionName.set(tigerVersion)
+                output.versionCode.set(parts[0] * 10_000_000 + parts[1] * 10_000 + parts[2])
             }
         }
     }

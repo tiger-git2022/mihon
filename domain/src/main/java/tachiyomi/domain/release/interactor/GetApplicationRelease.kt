@@ -38,7 +38,7 @@ class GetApplicationRelease(
             newVersion.toInt() > commitCount
         } else {
             // Fork: release builds are based on releases in "tiger-git2022/mihon"
-            // tagged as something like "v0.21.2-t5", see [ForkVersion]
+            // tagged as something like "v2.4.0" (earlier "v0.21.2-t5"), see [ForkVersion]
             ForkVersion.isNewer(versionName, versionTag)
         }
     }

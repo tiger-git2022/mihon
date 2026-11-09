@@ -1,11 +1,10 @@
 # Fork (tiger-git2022/mihon): build signed release APKs and publish them as a GitHub Release.
 #
-# Version scheme: tag/versionName "v<upstream versionName>-t<NNN>", versionCode
-# "<upstream versionCode> * 1000 + N". N starts at 1 for every upstream version and increases with
-# each release of it, so versionCode always increases. N has three digits because GitHub orders
-# releases of the same day by their tag's pre-release part as text, which put "t9" above "t12";
-# older tags have no padding. The in-app updater compares versions the
-# same way (domain/.../release/interactor/ForkVersion.kt).
+# Version scheme: the fork's own semantic version, tag/versionName "vX.Y.Z". .github/fork-version holds
+# X.Y: a pull request with a new feature (or an upstream update) raises Y, a big change raises X. Z counts
+# the releases of X.Y from 0, so a fix needs no edit. versionCode X * 10000000 + Y * 10000 + Z, above the
+# earlier "v<upstream>-tNNN" releases (upstream versionCode * 1000 + N). The in-app updater compares
+# versions the same way (domain/.../release/interactor/ForkVersion.kt).
 name: Tiger Release
 
 on:
@@ -63,7 +62,7 @@ jobs:
           set -euo pipefail
           git fetch --force --tags origin
 
-          existing=$(git tag --points-at HEAD --list 'v*-t*' | head -n 1)
+          existing=$(git tag --points-at HEAD --list 'v*' | head -n 1)
           if [ -n "$existing" ] && [ "$FORCE" != "true" ]; then
             echo "Commit $(git rev-parse --short HEAD) was already released as $existing, skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -71,29 +70,37 @@ jobs:
           fi
 
           upstream_name=$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)".*/\1/p' app/build.gradle.kts | head -n 1)
-          upstream_code=$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+).*/\1/p' app/build.gradle.kts | head -n 1)
-          if [ -z "$upstream_name" ] || [ -z "$upstream_code" ]; then
-            echo "::error::Could not read versionName/versionCode from app/build.gradle.kts"
+          if [ -z "$upstream_name" ]; then
+            echo "::error::Could not read versionName from app/build.gradle.kts"
             exit 1
           fi
-
-          last=$(git tag --list "v${upstream_name}-t*" | sed -E "s/^v.*-t//" | grep -E '^[0-9]+$' | sort -n | tail -n 1 || true)
-          # 10# reads "012" as twelve, not as an octal number
-          build=$(( 10#${last:-0} + 1 ))
-          version_name=$(printf '%s-t%03d' "$upstream_name" "$build")
-          version_code=$(( upstream_code * 1000 + build ))
-          previous=$(git describe --tags --abbrev=0 --match 'v*-t*' HEAD 2>/dev/null || true)
+          series=$(tr -d '[:space:]' < .github/fork-version)
+          if ! [[ "$series" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::.github/fork-version must hold MAJOR.MINOR, such as 2.4, not '$series'"
+            exit 1
+          fi
+          last=$(git tag --list "v${series}.*" | sed "s/^v${series}\.//" | grep -E '^[0-9]+$' | sort -n | tail -n 1 || true)
+          if [ -n "$last" ]; then patch=$(( last + 1 )); else patch=0; fi
+          version_name="$series.$patch"
+          # A lower X.Y in .github/fork-version would publish a release older than the latest one
+          newest=$(git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)
+          if [ -n "$newest" ] && [ "$(printf '%s\n' "$newest" "v$version_name" | sort -V | tail -n 1)" != "v$version_name" ]; then
+            echo "::error::v$version_name would be older than $newest, raise .github/fork-version"
+            exit 1
+          fi
+          IFS=. read -r major minor <<< "$series"
+          version_code=$(( major * 10000000 + minor * 10000 + patch ))
+          previous=$(git describe --tags --abbrev=0 --match 'v[0-9]*' HEAD 2>/dev/null || true)
 
           {
             echo "skip=false"
             echo "upstream_name=$upstream_name"
-            echo "build=$build"
             echo "version_name=$version_name"
             echo "version_code=$version_code"
             echo "tag=v$version_name"
             echo "previous=$previous"
           } >> "$GITHUB_OUTPUT"
-          echo "Releasing v$version_name (versionCode $version_code), previous release: ${previous:-none}"
+          echo "Releasing v$version_name (versionCode $version_code), upstream $upstream_name, previous release: ${previous:-none}"
 
       - name: Set up JDK
         if: steps.version.outputs.skip != 'true'
@@ -143,7 +150,7 @@ jobs:
           keyPassword: ${{ secrets.KEY_PASSWORD }}
         run: >-
           ./gradlew assembleRelease
-          -Ptiger.buildNumber=${{ steps.version.outputs.build }}
+          -Ptiger.version=${{ steps.version.outputs.version_name }}
           -Pinclude-telemetry=false
           -Penable-updater=true
 

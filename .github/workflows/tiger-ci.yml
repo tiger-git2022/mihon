@@ -42,7 +42,7 @@ jobs:
         run: ./gradlew testDebugUnitTest
 
       - name: Build release APK (debug-signed)
-        run: ./gradlew assembleRelease -Ptiger.buildNumber=1 -Pinclude-telemetry=false -Penable-updater=true
+        run: ./gradlew assembleRelease -Ptiger.version=0.0.1 -Pinclude-telemetry=false -Penable-updater=true
 
       - name: Check code format
         run: ./gradlew spotlessCheck
