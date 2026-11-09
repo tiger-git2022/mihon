@@ -111,7 +111,7 @@ jobs:
         run: |
           set -o pipefail
           ./gradlew testDebugUnitTest assembleRelease \
-            -Ptiger.buildNumber=1 -Pinclude-telemetry=false -Penable-updater=true \
+            -Ptiger.version=0.0.1 -Pinclude-telemetry=false -Penable-updater=true \
             2>&1 | tee "$RUNNER_TEMP/build.log"
 
       - name: Push

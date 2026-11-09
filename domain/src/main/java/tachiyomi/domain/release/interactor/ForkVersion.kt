@@ -3,10 +3,10 @@ package tachiyomi.domain.release.interactor
 /**
  * Version of a tiger-git2022/mihon release (fork-only).
  *
- * Fork releases are tagged `v<upstream version>-t<build number>`, e.g. `v0.21.2-t005` (older
- * ones `v0.21.2-t5`). A version
- * without the `-t` suffix (an upstream version, or a local build) has build number 0, so it is
- * older than any fork build of the same upstream version.
+ * Fork releases are tagged with the fork's own version `vX.Y.Z`, e.g. `v2.4.0`. Earlier ones were
+ * `v<upstream version>-t<build number>`, e.g. `v0.21.2-t005` (older ones `v0.21.2-t5`); the
+ * numbers compare first, so `2.4.0` is newer than all of them. A version without the `-t` suffix
+ * has build number 0.
  */
 internal data class ForkVersion(
     val upstream: List<Int>,

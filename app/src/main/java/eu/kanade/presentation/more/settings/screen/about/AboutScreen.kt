@@ -268,7 +268,8 @@ object AboutScreen : Screen() {
             }
             else -> {
                 val channel = if (isFossBuildType) "FOSS" else "Stable"
-                "$channel v${BuildConfig.VERSION_NAME}".let {
+                // Fork: the fork's own version, then the upstream Mihon version it is based on
+                "$channel v${BuildConfig.VERSION_NAME} · Mihon ${BuildConfig.UPSTREAM_VERSION_NAME}".let {
                     if (withBuildDate) {
                         "$it (${getFormattedBuildTime()})"
                     } else {

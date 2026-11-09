@@ -41,4 +41,20 @@ class ForkVersionTest {
         ForkVersion.isNewer(versionName = "0.21.2-t1", versionTag = "v0.21.1-t30") shouldBe false
         ForkVersion.isNewer(versionName = "0.21.2-t1", versionTag = "v0.21.2") shouldBe false
     }
+
+    @Test
+    fun `fork versions are newer than the numbered builds`() {
+        ForkVersion.isNewer(versionName = "0.21.3-t002", versionTag = "v2.4.0") shouldBe true
+        ForkVersion.isNewer(versionName = "0.21.3", versionTag = "v2.4.0") shouldBe true
+        ForkVersion.isNewer(versionName = "2.4.0", versionTag = "v0.21.3-t003") shouldBe false
+    }
+
+    @Test
+    fun `fork versions compare by number`() {
+        ForkVersion.isNewer(versionName = "2.4.0", versionTag = "v2.4.1") shouldBe true
+        ForkVersion.isNewer(versionName = "2.4.12", versionTag = "v2.5.0") shouldBe true
+        ForkVersion.isNewer(versionName = "2.4.9", versionTag = "v2.4.10") shouldBe true
+        ForkVersion.isNewer(versionName = "2.4.0", versionTag = "v2.4.0") shouldBe false
+        ForkVersion.isNewer(versionName = "2.5.0", versionTag = "v2.4.9") shouldBe false
+    }
 }
